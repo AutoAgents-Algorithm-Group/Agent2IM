@@ -1,0 +1,10 @@
+# 飞书应用配置
+feishu:
+  FEISHU_APP_ID: "cli_a82e97f4de29501c"
+  FEISHU_APP_SECRET: "nEoauWe1YEt5luG6J4Ij8cvlTZKb3po3"
+
+# AutoAgents AI服务配置
+autoagents:
+  AUTOAGENTS_AGENT_ID: "a5be5c6bad834cf4a73ed1d03bc7eafa"
+  AUTOAGENTS_AUTH_KEY: "7217394b7d3e4becab017447adeac239"
+  AUTOAGENTS_AUTH_SECRET: "f4Ziua6B0NexIMBGj1tQEVpe62EhkCWB"

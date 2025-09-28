@@ -1,0 +1,9 @@
+
+services:
+  feishu-bot:
+    build: .
+    ports:
+      - "9000:9000"
+    restart: unless-stopped
+    volumes:
+      - ../src/config/config.yaml:/app/config.yaml:ro
