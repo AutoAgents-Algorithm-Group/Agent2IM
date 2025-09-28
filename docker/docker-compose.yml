@@ -1,7 +1,9 @@
 
 services:
-  feishu-bot:
-    build: .
+  app:
+    build: 
+      context: ..
+      dockerfile: docker/Dockerfile
     ports:
       - "9000:9000"
     restart: unless-stopped
