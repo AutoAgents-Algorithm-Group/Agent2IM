@@ -343,6 +343,35 @@ class FeishuService:
             print(f"❌ 交互卡片发送失败: {e}")
             return None
     
+    def update_card_message(self, card: dict, message_id: str):
+        """更新已发送的交互式卡片"""
+        try:
+            access_token = self.get_access_token()
+            url = f"https://open.feishu.cn/open-apis/im/v1/messages/{message_id}"
+            
+            headers = {
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json"
+            }
+            
+            data = {
+                "msg_type": "interactive",
+                "content": json.dumps(card)
+            }
+            
+            response = requests.patch(url, headers=headers, json=data)
+            result = response.json()
+            
+            if result.get("code") == 0:
+                print(f"✅ 交互卡片更新成功")
+            else:
+                print(f"❌ 交互卡片更新失败: {result}")
+            
+            return result
+        except Exception as e:
+            print(f"❌ 交互卡片更新失败: {e}")
+            return None
+    
     # ========== 消息处理相关方法 ==========
     
     def process_message(self, data: Dict[str, Any]) -> bool:
@@ -364,19 +393,11 @@ class FeishuService:
             if not message:
                 return False
 
-            # 检查消息去重
+            # 获取消息ID（不再用于去重，API层已处理）
             message_id = message.get('message_id', '')
             if not message_id:
                 print("⚠️ 消息ID为空，跳过处理")
                 return False
-            
-            # 如果消息已处理过，直接跳过
-            if message_id in self.processed_messages:
-                print(f"⚠️ 消息 {message_id} 已处理过，跳过重复处理")
-                return False
-            
-            # 将消息ID加入已处理集合
-            self.processed_messages.add(message_id)
 
             # 获取消息基本信息
             message_type = message.get('message_type', '')

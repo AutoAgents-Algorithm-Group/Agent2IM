@@ -16,7 +16,6 @@ class AutoAgentsService:
         """调用AutoAgents生成回复"""
         try:
             content=""
-            
             for event in self.client.invoke(prompt=prompt):
                 if event['type'] == 'start_bubble':
                     print(f"💭 开始处理消息气泡 {event['bubble_id']}")
@@ -39,4 +38,29 @@ class AutoAgentsService:
                 
         except Exception as e:
             print(f"❌ AutoAgents调用失败: {e}")
+            return "AI服务暂时不可用，请稍后再试。"
+    
+    def invoke_stream(self, prompt: str, callback=None):
+        """调用AutoAgents生成回复（流式）"""
+        try:
+            content = ""
+            
+            for event in self.client.invoke(prompt=prompt):                        
+                if event['type'] == 'token':
+                    content += event['content']
+                    if callback:
+                        callback('token', event['content'], content)
+                    
+                elif event['type'] == 'finish':
+                    print(f"🎉 对话生成完成")
+                    if callback:
+                        callback('finish', content)
+                    break
+            
+            return content if content else "抱歉，我现在无法回答这个问题，请稍后再试。"
+                
+        except Exception as e:
+            print(f"❌ AutoAgents流式调用失败: {e}")
+            if callback:
+                callback('error', str(e))
             return "AI服务暂时不可用，请稍后再试。"
