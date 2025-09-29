@@ -89,9 +89,11 @@ docker-compose up -d
 # View application logs
 docker compose -f docker/docker-compose.yml logs -f app
 
-# Stop and remove old containers
-docker stop agent2im && docker rm agent2im
-docker rmi agent2im-app
+# Stop and remove containers
+docker compose -f docker/docker-compose.yml down
+
+# Rebuild and restart
+docker compose -f docker/docker-compose.yml up -d --build
 ```
 
 ## Platform Integration

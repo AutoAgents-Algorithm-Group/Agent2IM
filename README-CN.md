@@ -86,12 +86,14 @@ docker-compose up -d
 
 **故障排除**
 ```bash
-# View application logs
+# 查看应用日志
 docker compose -f docker/docker-compose.yml logs -f app
 
-# Stop and remove old containers
-docker stop agent2im && docker rm agent2im
-docker rmi agent2im-app
+# 停止并移除容器
+docker compose -f docker/docker-compose.yml down
+
+# 重新构建并启动
+docker compose -f docker/docker-compose.yml up -d --build
 ```
 
 ## 平台集成
