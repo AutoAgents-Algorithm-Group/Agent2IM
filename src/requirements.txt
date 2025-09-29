@@ -2,6 +2,5 @@ fastapi
 uvicorn
 requests
 pydantic
-pyyaml
 autoagents-core
 pytz

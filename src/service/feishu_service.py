@@ -3,8 +3,194 @@ import requests
 import time
 import datetime
 import pytz
+import re
 from typing import Dict, Any, Set
 from .autoagents_service import AutoAgentsService
+
+
+class EventManager:
+    """全局事件去重管理器"""
+    
+    def __init__(self):
+        # 全局事件去重缓存（生产环境建议使用Redis）
+        self.processed_events: Set[str] = set()
+        self.event_timestamps: dict = {}  # 记录事件处理时间，用于清理过期事件
+    
+    def is_event_processed(self, event_id: str) -> bool:
+        """检查事件是否已处理"""
+        return event_id in self.processed_events
+
+    def mark_event_processed(self, event_id: str):
+        """标记事件已处理"""
+        self.processed_events.add(event_id)
+        self.event_timestamps[event_id] = time.time()
+
+    def cleanup_old_events(self):
+        """清理10分钟以前的事件记录"""
+        current_time = time.time()
+        expired_events = [
+            event_id for event_id, timestamp in self.event_timestamps.items()
+            if current_time - timestamp > 600  # 10分钟
+        ]
+        
+        for event_id in expired_events:
+            self.processed_events.discard(event_id)
+            self.event_timestamps.pop(event_id, None)
+        
+        if expired_events:
+            print(f"🧹 清理了 {len(expired_events)} 个过期事件记录")
+
+
+# 全局事件管理器实例
+event_manager = EventManager()
+
+
+class TypingEffectHandler:
+    """打字效果处理器"""
+    
+    def __init__(self, feishu_service, reply_to_message_id: str, user_message: str, timestamp: str):
+        self.feishu_service = feishu_service
+        self.reply_to_message_id = reply_to_message_id
+        self.user_message = user_message
+        self.timestamp = timestamp
+        self.current_content = ""
+        self.sent_message_id = None
+        self.first_token = True
+        self.update_counter = 0
+        
+    def handle_stream_event(self, event_type: str, data, full_content=None):
+        """处理流式事件"""
+        try:
+            if event_type == 'start_bubble':
+                print(f"⌨️ 开始打字效果，气泡ID: {data}")
+                
+            elif event_type == 'reasoning_token':
+                # 推理token通常不显示给用户
+                pass
+                
+            elif event_type == 'token':
+                token = data
+                self.current_content = full_content or (self.current_content + token)
+                
+                if self.first_token:
+                    # 发送第一个卡片
+                    self._send_initial_card()
+                    self.first_token = False
+                else:
+                    # 更新现有卡片（每几个token更新一次，避免过于频繁）
+                    self.update_counter += 1
+                    if self.update_counter >= 3:  # 每3个token更新一次
+                        self._update_card(is_typing=True)
+                        self.update_counter = 0
+                
+            elif event_type == 'end_bubble':
+                print("⌨️ 消息气泡结束")
+                
+            elif event_type == 'finish':
+                print("⌨️ 打字效果完成")
+                self.current_content = full_content or self.current_content
+                self._update_card(is_typing=False)
+                
+            elif event_type == 'error':
+                print(f"❌ 流式处理错误: {data}")
+                if not self.sent_message_id:
+                    # 如果还没发送过卡片，发送错误信息
+                    error_card = self.feishu_service.create_ai_response_card(
+                        ai_response="抱歉，AI服务暂时不可用，请稍后再试。",
+                        user_message=self.user_message,
+                        timestamp=self.timestamp
+                    )
+                    self.feishu_service.reply_with_card(error_card, self.reply_to_message_id)
+                
+        except Exception as e:
+            print(f"❌ 处理流式事件失败: {e}")
+    
+    def _send_initial_card(self):
+        """发送初始卡片"""
+        try:
+            card = self._create_typing_card(is_typing=True)
+            result = self.feishu_service.reply_with_card(card, self.reply_to_message_id)
+            
+            if result and result.get("code") == 0:
+                self.sent_message_id = result.get("data", {}).get("message_id")
+                print(f"📤 初始打字卡片已发送，消息ID: {self.sent_message_id}")
+            else:
+                print("❌ 初始卡片发送失败")
+                
+        except Exception as e:
+            print(f"❌ 发送初始卡片失败: {e}")
+    
+    def _update_card(self, is_typing: bool = False):
+        """更新卡片"""
+        try:
+            if not self.sent_message_id:
+                return
+                
+            card = self._create_typing_card(is_typing=is_typing)
+            self.feishu_service.update_card_message(card, self.sent_message_id)
+            
+        except Exception as e:
+            print(f"❌ 更新卡片失败: {e}")
+    
+    def _create_typing_card(self, is_typing: bool = False) -> dict:
+        """创建打字效果的卡片"""
+        elements = []
+        
+        # AI回复内容
+        display_content = self.current_content if self.current_content else "　"  # 使用全角空格占位
+        
+        # 如果正在打字，添加打字光标效果
+        if is_typing and self.current_content:
+            display_content += "▋"  # 打字光标
+        
+        elements.append({
+            "tag": "div",
+            "text": {
+                "tag": "lark_md",
+                "content": display_content
+            }
+        })
+        
+        # 底部信息栏
+        footer_elements = []
+        
+        if is_typing:
+            footer_elements.append({
+                "tag": "plain_text",
+                "content": "AI正在输入..."
+            })
+        else:
+            footer_text = f"回复时间: {self.timestamp}"
+            if self.current_content:
+                footer_text += f" • 字数: {len(self.current_content)}"
+            footer_elements.append({
+                "tag": "plain_text", 
+                "content": footer_text
+            })
+        
+        if footer_elements:
+            elements.append({
+                "tag": "hr"
+            })
+            elements.append({
+                "tag": "note",
+                "elements": footer_elements
+            })
+        
+        # 构建完整的卡片
+        card = {
+            "config": {
+                "wide_screen_mode": True,
+                "enable_forward": True,
+                "update_multi": False
+            },
+            "header": {
+                "template": "indigo"
+            },
+            "elements": elements
+        }
+        
+        return card
 
 
 class FeishuService:
@@ -576,3 +762,332 @@ class FeishuService:
             return "感谢您的反馈！很高兴我的回答对您有帮助。如有其他问题，随时@我！"
         else:
             return "感谢您的反馈！我会继续努力提供更好的服务。如有其他需要，请随时告诉我！"
+    
+    # ========== 新增的异步消息处理方法 ==========
+    
+    async def process_message_async(self, data: dict, event_id: str):
+        """异步处理消息的后台任务 - 打字效果版本"""
+        try:
+            print(f"🚀 开始异步处理消息 (Event: {event_id})")
+            
+            # 直接处理消息并实现打字效果
+            result = await self.process_with_typing_effect(data)
+            
+            if result:
+                print(f"✅ 异步消息处理完成 (Event: {event_id})")
+            else:
+                print(f"ℹ️ 异步消息未处理（不符合触发条件）(Event: {event_id})")
+                
+        except Exception as e:
+            print(f"❌ 异步处理消息失败 (Event: {event_id}): {e}")
+
+    async def process_with_typing_effect(self, data: dict):
+        """处理消息并实现打字效果"""
+        try:
+            # 处理飞书消息事件
+            event = data.get('event', {})
+            if not event:
+                return False
+
+            message = event.get('message', {})
+            if not message:
+                return False
+
+            # 获取消息基本信息
+            message_type = message.get('message_type', '')
+            if message_type != 'text':
+                return False
+
+            # 获取消息内容
+            content = message.get('content', '{}')
+            if isinstance(content, str):
+                try:
+                    content_data = json.loads(content)
+                except:
+                    content_data = {"text": content}
+            else:
+                content_data = content
+
+            text = content_data.get('text', '').strip()
+            if not text:
+                return False
+
+            # 检查是否@了机器人
+            mentions = message.get('mentions', [])
+            is_mentioned = len(mentions) > 0
+
+            # 检查消息中是否包含@bot关键词
+            trigger_keywords = ['@bot', '@机器人', '@AI']
+            has_trigger = any(keyword in text for keyword in trigger_keywords)
+
+            if not (is_mentioned or has_trigger):
+                return False
+
+            print(f"⌨️ 开始流式生成AI回复...")
+
+            # 获取chat_id以维护会话
+            chat_id = message.get('chat_id', '')
+            message_id = message.get('message_id', '')
+            
+            # 清理用户消息，移除@机器人的部分
+            cleaned_message = text.replace('@bot', '').replace('@机器人', '').strip()
+            cleaned_message = re.sub(r'@[^\s]+', '', cleaned_message).strip()
+
+            if not cleaned_message:
+                # 静态回复，直接发送
+                static_response = "请问您需要什么帮助？"
+                beijing_tz = pytz.timezone('Asia/Shanghai')
+                beijing_time = datetime.datetime.now(beijing_tz)
+                timestamp = beijing_time.strftime("%Y-%m-%d %H:%M:%S")
+                
+                card = self.create_ai_response_card(
+                    ai_response=static_response,
+                    user_message=cleaned_message,
+                    timestamp=timestamp
+                )
+                self.reply_with_card(card, message_id)
+                return True
+            else:
+                # 初始化会话（如果不存在）
+                if chat_id not in self.chat_sessions:
+                    self.chat_sessions[chat_id] = {
+                        'messages': [],
+                        'last_interaction': time.time()
+                    }
+                
+                # 添加用户消息到会话历史
+                self.chat_sessions[chat_id]['messages'].append({
+                    'role': 'user',
+                    'content': cleaned_message,
+                    'timestamp': time.time(),
+                    'message_id': message_id
+                })
+                
+                # 创建北京时间戳
+                beijing_tz = pytz.timezone('Asia/Shanghai')
+                beijing_time = datetime.datetime.now(beijing_tz)
+                timestamp = beijing_time.strftime("%Y-%m-%d %H:%M:%S")
+                
+                # 创建打字效果处理器
+                typing_handler = TypingEffectHandler(self, message_id, cleaned_message, timestamp)
+                
+                # 使用流式调用
+                final_content = self.ai_service.invoke_stream(
+                    cleaned_message, 
+                    callback=typing_handler.handle_stream_event
+                )
+                
+                # 添加AI回复到会话历史
+                self.chat_sessions[chat_id]['messages'].append({
+                    'role': 'assistant', 
+                    'content': final_content,
+                    'timestamp': time.time()
+                })
+                
+                # 更新最后交互时间
+                self.chat_sessions[chat_id]['last_interaction'] = time.time()
+                
+                # 清理过期会话（保持最近50条消息）
+                if len(self.chat_sessions[chat_id]['messages']) > 50:
+                    self.chat_sessions[chat_id]['messages'] = self.chat_sessions[chat_id]['messages'][-50:]
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ 处理打字效果失败: {e}")
+            return False
+
+    async def process_and_update_card(self, data: dict, processing_message_id: str):
+        """处理消息并更新卡片"""
+        try:
+            # 处理飞书消息事件
+            event = data.get('event', {})
+            if not event:
+                return False
+
+            message = event.get('message', {})
+            if not message:
+                return False
+
+            # 获取消息基本信息
+            message_type = message.get('message_type', '')
+            if message_type != 'text':
+                return False
+
+            # 获取消息内容
+            content = message.get('content', '{}')
+            if isinstance(content, str):
+                try:
+                    content_data = json.loads(content)
+                except:
+                    content_data = {"text": content}
+            else:
+                content_data = content
+
+            text = content_data.get('text', '').strip()
+            if not text:
+                return False
+
+            # 检查是否@了机器人
+            mentions = message.get('mentions', [])
+            is_mentioned = len(mentions) > 0
+
+            # 检查消息中是否包含@bot关键词
+            trigger_keywords = ['@bot', '@机器人', '@AI']
+            has_trigger = any(keyword in text for keyword in trigger_keywords)
+
+            if not (is_mentioned or has_trigger):
+                return False
+
+            print(f"🤖 开始生成AI回复...")
+
+            # 获取chat_id以维护会话
+            chat_id = message.get('chat_id', '')
+            message_id = message.get('message_id', '')
+            
+            # 清理用户消息，移除@机器人的部分
+            cleaned_message = text.replace('@bot', '').replace('@机器人', '').strip()
+            cleaned_message = re.sub(r'@[^\s]+', '', cleaned_message).strip()
+
+            if not cleaned_message:
+                ai_response = "请问您需要什么帮助？"
+            else:
+                # 初始化会话（如果不存在）
+                if chat_id not in self.chat_sessions:
+                    self.chat_sessions[chat_id] = {
+                        'messages': [],
+                        'last_interaction': time.time()
+                    }
+                
+                # 添加用户消息到会话历史
+                self.chat_sessions[chat_id]['messages'].append({
+                    'role': 'user',
+                    'content': cleaned_message,
+                    'timestamp': time.time(),
+                    'message_id': message_id
+                })
+                
+                # 获取 AI 回复
+                ai_response = self.ai_service.invoke(cleaned_message)
+                
+                # 添加AI回复到会话历史
+                self.chat_sessions[chat_id]['messages'].append({
+                    'role': 'assistant', 
+                    'content': ai_response,
+                    'timestamp': time.time()
+                })
+                
+                # 更新最后交互时间
+                self.chat_sessions[chat_id]['last_interaction'] = time.time()
+                
+                # 清理过期会话（保持最近50条消息）
+                if len(self.chat_sessions[chat_id]['messages']) > 50:
+                    self.chat_sessions[chat_id]['messages'] = self.chat_sessions[chat_id]['messages'][-50:]
+            
+            # 创建北京时间戳
+            beijing_tz = pytz.timezone('Asia/Shanghai')
+            beijing_time = datetime.datetime.now(beijing_tz)
+            timestamp = beijing_time.strftime("%Y-%m-%d %H:%M:%S")
+            
+            # 创建最终的交互式卡片
+            final_card = self.create_ai_response_card(
+                ai_response=ai_response,
+                user_message=cleaned_message,
+                timestamp=timestamp
+            )
+            
+            # 更新原来的处理中卡片为最终结果
+            if processing_message_id:
+                self.update_card_message(final_card, processing_message_id)
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ 处理和更新卡片失败: {e}")
+            return False
+
+    async def send_processing_card(self, data: dict):
+        """发送处理中的卡片，返回发送的消息ID"""
+        try:
+            event = data.get('event', {})
+            message = event.get('message', {})
+            
+            if not message:
+                return None
+            
+            # 检查是否是@机器人的消息
+            mentions = message.get('mentions', [])
+            if not mentions:
+                return None
+                
+            message_id = message.get('message_id', '')
+            
+            if message_id:
+                # 创建处理中卡片
+                processing_card = {
+                    "config": {
+                        "wide_screen_mode": True,
+                        "enable_forward": True
+                    },
+                    "header": {
+                        "template": "indigo"
+                    },
+                    "elements": [
+                        {
+                            "tag": "div",
+                            "text": {
+                                "tag": "lark_md",
+                                "content": "**正在思考中，请稍候...**"
+                            }
+                        },
+                        {
+                            "tag": "note",
+                            "elements": [
+                                {
+                                    "tag": "plain_text",
+                                    "content": "AI正在为您生成回答，通常需要几秒钟时间"
+                                }
+                            ]
+                        }
+                    ]
+                }
+                
+                # 发送处理中卡片并获取返回的消息ID
+                result = self.reply_with_card(processing_card, message_id)
+                
+                if result and result.get("code") == 0:
+                    # 提取新发送的消息ID
+                    sent_message_id = result.get("data", {}).get("message_id")
+                    print(f"📤 处理中卡片已发送，消息ID: {sent_message_id}")
+                    return sent_message_id
+                
+            return None
+                
+        except Exception as e:
+            print(f"❌ 发送处理中卡片失败: {e}")
+            return None
+    
+    # ========== 静态方法 ==========
+    
+    @staticmethod
+    def create_dynamic_services(agent_id: str, auth_key: str, auth_secret: str, app_id: str, app_secret: str):
+        """动态创建服务实例"""
+        try:
+            # 创建动态AI服务
+            dynamic_ai_service = AutoAgentsService(
+                agent_id=agent_id,
+                auth_key=auth_key,
+                auth_secret=auth_secret
+            )
+            
+            # 创建动态飞书服务
+            dynamic_feishu_service = FeishuService(
+                app_id=app_id,
+                app_secret=app_secret,
+                ai_service=dynamic_ai_service
+            )
+            
+            return dynamic_feishu_service
+        except Exception as e:
+            print(f"❌ 创建动态服务失败: {e}")
+            return None
