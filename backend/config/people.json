@@ -1,0 +1,105 @@
+{
+  "people": [
+    {
+      "id": "001",
+      "name": "刘安营",
+      "exceptions": [],
+      "off": false
+    },
+    {
+      "id": "002",
+      "name": "韩宇轩",
+      "exceptions": [],
+      "off": false
+    },
+    {
+      "id": "003",
+      "name": "徐俊朗",
+      "exceptions": [],
+      "off": false
+    },
+    {
+      "id": "004",
+      "name": "耿蕾",
+      "exceptions": [],
+      "off": false
+    },
+    {
+      "id": "005",
+      "name": "石国艳",
+      "exceptions": [],
+      "off": false
+    },
+    {
+      "id": "006",
+      "name": "邓健轩",
+      "exceptions": [],
+      "off": false
+    },
+    {
+      "id": "007",
+      "name": "吴文静",
+      "exceptions": [],
+      "off": false
+    },
+    {
+      "id": "008",
+      "name": "徐晓东",
+      "exceptions": [],
+      "off": false
+    },
+    {
+      "id": "009",
+      "name": "李佳豪",
+      "exceptions": [],
+      "off": false
+    },
+    {
+      "id": "010",
+      "name": "陈亮",
+      "exceptions": [],
+      "off": false
+    },
+    {
+      "id": "011",
+      "name": "孙劲宇",
+      "exceptions": [],
+      "off": false
+    },
+    {
+      "id": "012",
+      "name": "李鹤",
+      "exceptions": [],
+      "off": false
+    },
+    {
+      "id": "013",
+      "name": "黄克胜",
+      "exceptions": [],
+      "off": false
+    },
+    {
+      "id": "014",
+      "name": "胡东利",
+      "exceptions": [],
+      "off": false
+    },
+    {
+      "id": "015",
+      "name": "滕凯",
+      "exceptions": ["星期二"],
+      "off": false
+    },
+    {
+      "id": "016",
+      "name": "莫铭浩",
+      "exceptions": [],
+      "off": false
+    }
+  ],
+  "settings": {
+    "check_exceptions": true,
+    "check_frequency": true,
+    "default_frequency": "monday, tuesday, wednesday, thursday, friday"
+  }
+}
