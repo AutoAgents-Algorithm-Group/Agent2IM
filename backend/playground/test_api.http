@@ -1,0 +1,82 @@
+### 飞书工时检查API测试文件
+### 使用 VS Code REST Client 插件运行
+### 或者使用 curl/httpie 等工具
+
+### ==========================================================
+### 变量配置
+### ==========================================================
+
+@baseUrl = http://localhost:9000
+@app_id = cli_a87352e3c577900e
+@app_secret = DlVXx6WbRuDh4PnJkhZeUpjlaXcthWwY
+@group_chat_id = oc_your_group_chat_id_here
+@bitable_url = https://uxkpl4cba3j.feishu.cn/base/UfDPbov0Eal3RpsWAEBcyfe1nAb?table=tbla3OuZeDczpqZx&view=vewGyZRz6D
+
+
+### ==========================================================
+### 1. 检查服务状态
+### ==========================================================
+
+GET {{baseUrl}}/ HTTP/1.1
+
+
+### ==========================================================
+### 2. 检查今天的工时填写情况（默认）
+### ==========================================================
+
+GET {{baseUrl}}/feishu/labor_hour/{{app_id}}-{{app_secret}}/{{group_chat_id}}/{{bitable_url}} HTTP/1.1
+
+
+### ==========================================================
+### 3. 检查指定日期的工时填写情况（2025-09-30）
+### ==========================================================
+
+GET {{baseUrl}}/feishu/labor_hour/{{app_id}}-{{app_secret}}/{{group_chat_id}}/{{bitable_url}}?date=2025-09-30 HTTP/1.1
+
+
+### ==========================================================
+### 4. 检查节假日（应该返回节假日提示）
+### ==========================================================
+
+GET {{baseUrl}}/feishu/labor_hour/{{app_id}}-{{app_secret}}/{{group_chat_id}}/{{bitable_url}}?date=2025-10-01 HTTP/1.1
+
+
+### ==========================================================
+### 5. 检查周末（应该返回节假日提示）
+### ==========================================================
+
+GET {{baseUrl}}/feishu/labor_hour/{{app_id}}-{{app_secret}}/{{group_chat_id}}/{{bitable_url}}?date=2025-10-25 HTTP/1.1
+
+
+### ==========================================================
+### 6. 检查星期二（滕凯的例外日期）
+### ==========================================================
+
+GET {{baseUrl}}/feishu/labor_hour/{{app_id}}-{{app_secret}}/{{group_chat_id}}/{{bitable_url}}?date=2025-10-07 HTTP/1.1
+
+
+### ==========================================================
+### 7. 查看定时任务状态
+### ==========================================================
+
+GET {{baseUrl}}/scheduler/status HTTP/1.1
+
+
+### ==========================================================
+### 8. 查看所有定时任务
+### ==========================================================
+
+GET {{baseUrl}}/scheduler/jobs HTTP/1.1
+
+
+### ==========================================================
+### curl 命令示例（如果不使用REST Client）
+### ==========================================================
+
+# 检查今天的工时
+# curl "http://localhost:9000/feishu/labor_hour/cli_a82e97f4de29501c-nEoauWe1YEt5luG6J4Ij8cvlTZKb3po3/oc_xxx/https://uxkpl4cba3j.feishu.cn/base/UfDPbov0Eal3RpsWAEBcyfe1nAb?table=tbla3OuZeDczpqZx&view=vewGyZRz6D"
+
+# 检查指定日期
+# curl "http://localhost:9000/feishu/labor_hour/cli_a82e97f4de29501c-nEoauWe1YEt5luG6J4Ij8cvlTZKb3po3/oc_xxx/https://uxkpl4cba3j.feishu.cn/base/UfDPbov0Eal3RpsWAEBcyfe1nAb?table=tbla3OuZeDczpqZx&view=vewGyZRz6D?date=2025-09-30"
+
+

@@ -1,9 +1,3 @@
-#!/usr/bin/env python3
-"""
-定时任务启动脚本 - 简化版
-用于快速测试定时提醒功能
-"""
-
 import sys
 import time
 from pathlib import Path
@@ -15,37 +9,16 @@ sys.path.insert(0, str(backend_dir))
 from utils.schedule.scheduler import ReminderScheduler
 
 
-def main():
-    print("=" * 80)
-    print("  飞书定时任务调度器 - 测试启动")
-    print("=" * 80)
-    
+def main():    
+
     try:
         # 配置目录
         config_dir = backend_dir / "config"
-        
-        print(f"\n📂 配置目录: {config_dir}")
-        print(f"   - task.json")
-        print(f"   - message.json")
-        print(f"   - people.json")
-        
-        # 创建调度器
-        print("\n🔧 正在初始化调度器...")
+
         scheduler = ReminderScheduler(config_dir=str(config_dir))
-        
-        # 初始化飞书服务
-        print("\n🔧 正在初始化飞书服务...")
+
         scheduler.init_feishu_service(ai_service=None)
         
-        print("\n" + "=" * 80)
-        print("  选择测试模式")
-        print("=" * 80)
-        print("1. 手动触发任务（立即执行一次）")
-        print("2. 启动定时调度器（按配置时间自动执行）")
-        print("3. 查看配置信息")
-        print("4. 测试Bitable连接")
-        print("0. 退出")
-        print("=" * 80)
         
         choice = input("\n请选择 (0-4): ").strip()
         
@@ -154,7 +127,7 @@ def show_config(scheduler):
     print("\n📊 多维表格配置:")
     print(f"   App Token: {scheduler.bitable_app_token}")
     print(f"   Table ID: {scheduler.bitable_table_id}")
-    
+      
     # 任务配置
     print("\n📋 定时任务:")
     tasks = scheduler.task_config.get("tasks", [])
@@ -217,4 +190,3 @@ def test_bitable_connection(scheduler):
 
 if __name__ == "__main__":
     main()
-

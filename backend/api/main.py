@@ -13,8 +13,14 @@ src_dir = current_dir.parent
 sys.path.insert(0, str(src_dir))
 
 from utils.feishu import FeishuService
+from utils.feishu.client import FeishuClient
+from utils.feishu.bitable import BitableAPI
+from utils.feishu.message import MessageAPI
+from utils.feishu.card import CardBuilder
 from utils.schedule import ReminderScheduler
 from utils import event_manager
+from datetime import datetime
+import pytz
 
 # 创建FastAPI应用
 app = FastAPI(
@@ -80,6 +86,7 @@ def read_root():
         },
         "endpoint": {
             "feishu_webhook": "/feishu/webhook/{agent_id}-{auth_key}-{auth_secret}/{app_id}-{app_secret}",
+            "labor_hour_check": "/feishu/labor_hour/{app_id}-{app_secret}/{group_chat_id}/{bitable_url}",
             "example": "/feishu/webhook/agent123-key456-secret789/app111-secret222",
             "scheduler_status": "/scheduler/status",
             "scheduler_jobs": "/scheduler/jobs"
@@ -216,6 +223,181 @@ async def feishu_webhook(
             content={"status": "error", "message": str(e)}, 
             status_code=500
         )
+
+@app.get("/feishu/labor_hour/{app_id}-{app_secret}/{group_chat_id}/{bitable_url:path}")
+async def check_labor_hour(
+    app_id: str = Path(..., description="飞书应用ID"),
+    app_secret: str = Path(..., description="飞书应用密钥"),
+    group_chat_id: str = Path(..., description="飞书群聊ID"),
+    bitable_url: str = Path(..., description="多维表格URL（完整URL）"),
+    date: str = None  # 查询参数，可选，默认为今天
+):
+    """
+    检查工时填写情况并发送到飞书群
+    
+    示例:
+    /feishu/labor_hour/cli_xxx-secret_xxx/oc_xxx/https://xxx.feishu.cn/base/xxx?table=xxx&view=xxx
+    
+    或带日期:
+    /feishu/labor_hour/cli_xxx-secret_xxx/oc_xxx/https://xxx.feishu.cn/base/xxx?table=xxx&view=xxx?date=2025-09-30
+    """
+    try:
+        print("=" * 80)
+        print(f"📋 开始检查工时填写情况")
+        print(f"   App ID: {app_id}")
+        print(f"   群聊ID: {group_chat_id}")
+        print(f"   Bitable URL: {bitable_url}")
+        
+        # 获取检查日期
+        if not date:
+            tz = pytz.timezone('Asia/Shanghai')
+            now = datetime.now(tz)
+            date = now.strftime('%Y-%m-%d')
+        
+        print(f"   检查日期: {date}")
+        
+        # 初始化飞书客户端
+        feishu_client = FeishuClient(app_id=app_id, app_secret=app_secret)
+        
+        # 初始化Bitable API
+        bitable = BitableAPI(client=feishu_client, url=bitable_url)
+        
+        # 检查填写情况
+        print(f"\n🔍 正在检查人员填写情况...")
+        result = bitable.check_users_filled(date_str=date)
+        
+        # 如果是节假日
+        if result.get('is_holiday'):
+            message = f"🎉 {date} 是节假日，无需检查工时填写"
+            print(f"\n{message}")
+            
+            # 发送到群聊
+            message_api = MessageAPI(feishu_client)
+            message_api.send_text_to_group(message, group_chat_id)
+            
+            return {
+                "status": "success",
+                "is_holiday": True,
+                "message": message,
+                "date": date
+            }
+        
+        # 构建消息卡片
+        print(f"\n📊 检查结果:")
+        print(f"   应填写人数: {len(result['filled']) + len(result['not_filled'])}")
+        print(f"   已填写: {len(result['filled'])} 人")
+        print(f"   未填写: {len(result['not_filled'])} 人")
+        print(f"   填写率: {result['fill_rate']:.1%}")
+        
+        # 创建卡片消息
+        card = create_labor_hour_card(result, date)
+        
+        # 发送到群聊
+        message_api = MessageAPI(feishu_client)
+        response = message_api.send_card_to_group(card, group_chat_id)
+        
+        print(f"\n✅ 消息已发送到群聊")
+        print("=" * 80)
+        
+        return {
+            "status": "success",
+            "is_holiday": False,
+            "date": date,
+            "result": {
+                "all_filled": result['all_filled'],
+                "total": len(result['filled']) + len(result['not_filled']),
+                "filled": len(result['filled']),
+                "not_filled": len(result['not_filled']),
+                "fill_rate": f"{result['fill_rate']:.1%}",
+                "on_leave": result.get('on_leave', []),
+                "exception_day": result.get('exception_day', [])
+            },
+            "message_sent": True
+        }
+        
+    except Exception as e:
+        print(f"\n❌ 检查失败: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        return JSONResponse(
+            content={
+                "status": "error",
+                "message": str(e),
+                "date": date if date else "unknown"
+            },
+            status_code=500
+        )
+
+
+def create_labor_hour_card(result: dict, date: str) -> dict:
+    """创建工时填写情况卡片"""
+    
+    # 根据填写率选择颜色
+    fill_rate = result['fill_rate']
+    if fill_rate >= 1.0:
+        color = "green"
+        header_template = "turquoise"
+    elif fill_rate >= 0.8:
+        color = "orange"
+        header_template = "orange"
+    else:
+        color = "red"
+        header_template = "red"
+    
+    # 卡片头部
+    card = {
+        "type": "template",
+        "data": {
+            "template_id": "ctp_AA6vy9zAxgFj",
+            "template_variable": {
+                "title": f"📊 工时填写情况 - {date}",
+                "header_background": header_template
+            }
+        }
+    }
+    
+    # 使用CardBuilder创建
+    if result['all_filled']:
+        content = f"✅ **太棒了！所有人都已填写工时！**\n\n"
+    else:
+        content = f"⚠️ **还有 {len(result['not_filled'])} 人未填写工时**\n\n"
+    
+    content += f"📈 **统计信息:**\n"
+    content += f"- 应填写人数: {len(result['filled']) + len(result['not_filled'])} 人\n"
+    content += f"- 已填写: {len(result['filled'])} 人 ✅\n"
+    content += f"- 未填写: {len(result['not_filled'])} 人 ❌\n"
+    content += f"- 填写率: {result['fill_rate']:.1%}\n"
+    
+    # 例外日期人员
+    if result.get('exception_day'):
+        content += f"\n📅 **例外日期人员** ({len(result['exception_day'])} 人):\n"
+        content += "  " + "、".join(result['exception_day']) + "\n"
+    
+    # 请假人员
+    if result.get('on_leave'):
+        content += f"\n🏖️ **请假人员** ({len(result['on_leave'])} 人):\n"
+        content += "  " + "、".join(result['on_leave']) + "\n"
+    
+    # 未填写人员列表
+    if result['not_filled']:
+        content += f"\n❗ **需要提醒的人员:**\n"
+        for name in result['not_filled']:
+            content += f"  • {name}\n"
+    
+    content += f"\n⏰ 检查时间: {datetime.now(pytz.timezone('Asia/Shanghai')).strftime('%Y-%m-%d %H:%M:%S')}"
+    
+    card = CardBuilder.create_reminder_card(
+        title=f"📊 工时填写情况 - {date}",
+        content=content,
+        footer=f"填写率: {result['fill_rate']:.1%}",
+        button_text="",
+        button_url="",
+        template_color=color
+    )
+    
+    return card
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=9000)
