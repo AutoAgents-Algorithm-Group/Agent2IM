@@ -18,9 +18,11 @@ from utils.feishu.bitable import BitableAPI
 from utils.feishu.message import MessageAPI
 from utils.feishu.card import CardBuilder
 from utils.schedule import ReminderScheduler
+from utils.schedule.unified_scheduler import UnifiedScheduler
 from utils import event_manager
 from datetime import datetime
 import pytz
+import os
 
 # 创建FastAPI应用
 app = FastAPI(
@@ -31,38 +33,52 @@ app = FastAPI(
 
 # 全局定时任务调度器
 reminder_scheduler = None
+unified_scheduler = None
 
 @app.on_event("startup")
 async def startup_event():
     """应用启动时初始化定时任务"""
-    global reminder_scheduler
-    try:
-        print("🚀 正在启动定时任务调度器...")
-        
-        # 获取配置文件目录
-        config_dir = PathLib(__file__).parent.parent / "config"
-        
-        # 创建调度器实例
-        reminder_scheduler = ReminderScheduler(config_dir=str(config_dir))
-        
-        # 初始化飞书服务（不需要AI服务）
-        reminder_scheduler.init_feishu_service(ai_service=None)
-        
-        # 启动调度器
-        reminder_scheduler.start()
-        
-        print("✅ 定时任务调度器启动成功")
-    except Exception as e:
-        print(f"❌ 启动定时任务调度器失败: {e}")
-        print("⚠️ 应用将继续运行，但定时任务功能不可用")
+    global reminder_scheduler, unified_scheduler
+    
+    # 获取配置文件目录
+    config_dir = PathLib(__file__).parent.parent / "config"
+    
+    # 检查是否启用统一调度器（通过环境变量控制）
+    use_unified_scheduler = os.environ.get('USE_UNIFIED_SCHEDULER', 'false').lower() == 'true'
+    
+    if use_unified_scheduler:
+        # 使用新的统一调度器（包含新闻推送和工时检查）
+        try:
+            print("🚀 正在启动统一定时任务调度器...")
+            unified_scheduler = UnifiedScheduler(config_dir=str(config_dir))
+            unified_scheduler.start()
+            print("✅ 统一定时任务调度器启动成功")
+        except Exception as e:
+            print(f"❌ 启动统一定时任务调度器失败: {e}")
+            print("⚠️ 应用将继续运行，但定时任务功能不可用")
+    else:
+        # 使用旧的提醒调度器（仅工时检查提醒）
+        try:
+            print("🚀 正在启动定时任务调度器...")
+            reminder_scheduler = ReminderScheduler(config_dir=str(config_dir))
+            reminder_scheduler.init_feishu_service(ai_service=None)
+            reminder_scheduler.start()
+            print("✅ 定时任务调度器启动成功")
+        except Exception as e:
+            print(f"❌ 启动定时任务调度器失败: {e}")
+            print("⚠️ 应用将继续运行，但定时任务功能不可用")
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """应用关闭时停止定时任务"""
-    global reminder_scheduler
+    global reminder_scheduler, unified_scheduler
     try:
-        if reminder_scheduler:
+        if unified_scheduler:
+            print("🛑 正在停止统一定时任务调度器...")
+            unified_scheduler.stop()
+            print("✅ 统一定时任务调度器已停止")
+        elif reminder_scheduler:
             print("🛑 正在停止定时任务调度器...")
             reminder_scheduler.stop()
             print("✅ 定时任务调度器已停止")
@@ -73,14 +89,26 @@ async def shutdown_event():
 @app.get("/")
 def read_root():
     """根路径，显示服务状态"""
-    scheduler_status = "running" if reminder_scheduler and reminder_scheduler.scheduler.running else "stopped"
-    job_count = len(reminder_scheduler.scheduler.get_jobs()) if reminder_scheduler else 0
+    # 检查哪个调度器在运行
+    if unified_scheduler:
+        scheduler_status = "running" if unified_scheduler.scheduler.running else "stopped"
+        job_count = len(unified_scheduler.scheduler.get_jobs())
+        scheduler_type = "unified"
+    elif reminder_scheduler:
+        scheduler_status = "running" if reminder_scheduler.scheduler.running else "stopped"
+        job_count = len(reminder_scheduler.scheduler.get_jobs())
+        scheduler_type = "reminder"
+    else:
+        scheduler_status = "not_initialized"
+        job_count = 0
+        scheduler_type = "none"
     
     return {
         "message": "Agent2IM - 通用AI驱动的即时通讯集成平台", 
         "status": "ok",
         "version": "1.0.0",
         "scheduler": {
+            "type": scheduler_type,
             "status": scheduler_status,
             "job_count": job_count
         },
@@ -110,19 +138,27 @@ def read_root():
 @app.get("/scheduler/status")
 def scheduler_status():
     """获取定时任务调度器状态"""
-    if not reminder_scheduler:
+    if unified_scheduler:
+        is_running = unified_scheduler.scheduler.running
+        job_count = len(unified_scheduler.scheduler.get_jobs())
+        scheduler_type = "unified"
+        timezone = unified_scheduler.timezone
+    elif reminder_scheduler:
+        is_running = reminder_scheduler.scheduler.running
+        job_count = len(reminder_scheduler.scheduler.get_jobs())
+        scheduler_type = "reminder"
+        timezone = reminder_scheduler.timezone
+    else:
         return {
             "status": "not_initialized",
             "message": "定时任务调度器未初始化"
         }
     
-    is_running = reminder_scheduler.scheduler.running
-    job_count = len(reminder_scheduler.scheduler.get_jobs())
-    
     return {
         "status": "running" if is_running else "stopped",
+        "type": scheduler_type,
         "job_count": job_count,
-        "timezone": reminder_scheduler.timezone,
+        "timezone": timezone,
         "message": "定时任务调度器运行正常" if is_running else "定时任务调度器已停止"
     }
 
@@ -130,14 +166,18 @@ def scheduler_status():
 @app.get("/scheduler/jobs")
 def scheduler_jobs():
     """获取所有定时任务列表"""
-    if not reminder_scheduler:
+    if unified_scheduler:
+        jobs = unified_scheduler.scheduler.get_jobs()
+        scheduler_type = "unified"
+    elif reminder_scheduler:
+        jobs = reminder_scheduler.scheduler.get_jobs()
+        scheduler_type = "reminder"
+    else:
         return {
             "status": "error",
             "message": "定时任务调度器未初始化",
             "jobs": []
         }
-    
-    jobs = reminder_scheduler.scheduler.get_jobs()
     
     job_list = []
     for job in jobs:
@@ -150,6 +190,7 @@ def scheduler_jobs():
     
     return {
         "status": "ok",
+        "type": scheduler_type,
         "job_count": len(job_list),
         "jobs": job_list
     }
@@ -290,7 +331,7 @@ async def check_labor_hour(
         print(f"   填写率: {result['fill_rate']:.1%}")
         
         # 创建卡片消息
-        card = create_labor_hour_card(result, date)
+        card = create_labor_hour_card(result, date, bitable_url)
         
         # 发送到群聊
         message_api = MessageAPI(feishu_client)
@@ -330,71 +371,139 @@ async def check_labor_hour(
         )
 
 
-def create_labor_hour_card(result: dict, date: str) -> dict:
-    """创建工时填写情况卡片"""
+def create_labor_hour_card(result: dict, date: str, bitable_url: str = None) -> dict:
+    """创建工时填写情况卡片（美化版）"""
     
-    # 根据填写率选择颜色
+    # 根据填写率选择颜色和状态
     fill_rate = result['fill_rate']
     if fill_rate >= 1.0:
-        color = "green"
-        header_template = "turquoise"
+        header_template = "green"
+        status_emoji = "✅"
+        status_text = "太棒了！所有人都已填写工时！"
     elif fill_rate >= 0.8:
-        color = "orange"
         header_template = "orange"
+        status_emoji = "⚠️"
+        status_text = f"还有 {len(result['not_filled'])} 人未填写工时"
     else:
-        color = "red"
         header_template = "red"
+        status_emoji = "❌"
+        status_text = f"还有 {len(result['not_filled'])} 人未填写工时，请尽快填写！"
     
-    # 卡片头部
-    card = {
-        "type": "template",
-        "data": {
-            "template_id": "ctp_AA6vy9zAxgFj",
-            "template_variable": {
-                "title": f"📊 工时填写情况 - {date}",
-                "header_background": header_template
+    # 构建卡片元素
+    elements = []
+    
+    # 统计信息 - 简洁显示
+    total = len(result['filled']) + len(result['not_filled'])
+    filled = len(result['filled'])
+    
+    elements.append({
+        "tag": "div",
+        "text": {
+            "content": f"{status_emoji} **{filled}/{total} 人已填写工时**",
+            "tag": "lark_md"
+        }
+    })
+    
+    # 未填写人员列表 - 使用@功能
+    if result['not_filled']:
+        elements.append({"tag": "hr"})
+        
+        # 添加提示文案
+        elements.append({
+            "tag": "div",
+            "text": {
+                "content": "❗ **请以下同学尽快填写工时:**",
+                "tag": "lark_md"
             }
+        })
+        
+        # 构建@人员的内容
+        mention_content = ""
+        not_filled_with_id = result.get('not_filled_with_id', [])
+        
+        if not_filled_with_id:
+            for user_info in not_filled_with_id:
+                user_id = user_info.get('user_id', '')
+                name = user_info['name']
+                if user_id:
+                    mention_content += f"<at id={user_id}></at>  "
+                else:
+                    mention_content += f"{name}  "
+        else:
+            for name in result['not_filled']:
+                mention_content += f"{name}  "
+        
+        elements.append({
+            "tag": "div",
+            "text": {
+                "content": mention_content,
+                "tag": "lark_md"
+            }
+        })
+    
+    # 例外日期和请假人员（如果有）
+    extra_info = []
+    if result.get('exception_day'):
+        extra_info.append(f"📅 例外: " + "、".join(result['exception_day']))
+    if result.get('on_leave'):
+        extra_info.append(f"🏖️ 请假: " + "、".join(result['on_leave']))
+    
+    if extra_info:
+        elements.append({"tag": "hr"})
+        elements.append({
+            "tag": "div",
+            "text": {
+                "content": " | ".join(extra_info),
+                "tag": "lark_md"
+            }
+        })
+    
+    # 添加检查时间
+    elements.append({"tag": "hr"})
+    elements.append({
+        "tag": "div",
+        "text": {
+            "content": f"⏰ 检查时间: {datetime.now(pytz.timezone('Asia/Shanghai')).strftime('%Y-%m-%d %H:%M:%S')}",
+            "tag": "lark_md"
+        }
+    })
+    
+    # 添加底部按钮 - 链接到多维表格
+    if bitable_url:
+        elements.append({
+            "tag": "action",
+            "layout": "bisected",
+            "actions": [
+                {
+                    "tag": "button",
+                    "text": {
+                        "content": "📝 立即填写工时",
+                        "tag": "plain_text"
+                    },
+                    "url": bitable_url,
+                    "type": "primary",
+                    "size": "large"
+                }
+            ]
+        })
+    
+    card = {
+        "msg_type": "interactive",
+        "card": {
+            "config": {
+                "wide_screen_mode": True,
+                "enable_forward": True
+            },
+            "header": {
+                "template": header_template,
+                "title": {
+                    "content": f"📊 工时填写情况 - {date}",
+                    "tag": "plain_text"
+                }
+            },
+            "elements": elements
         }
     }
-    
-    # 使用CardBuilder创建
-    if result['all_filled']:
-        content = f"✅ **太棒了！所有人都已填写工时！**\n\n"
-    else:
-        content = f"⚠️ **还有 {len(result['not_filled'])} 人未填写工时**\n\n"
-    
-    content += f"📈 **统计信息:**\n"
-    content += f"- 应填写人数: {len(result['filled']) + len(result['not_filled'])} 人\n"
-    content += f"- 已填写: {len(result['filled'])} 人 ✅\n"
-    content += f"- 未填写: {len(result['not_filled'])} 人 ❌\n"
-    content += f"- 填写率: {result['fill_rate']:.1%}\n"
-    
-    # 例外日期人员
-    if result.get('exception_day'):
-        content += f"\n📅 **例外日期人员** ({len(result['exception_day'])} 人):\n"
-        content += "  " + "、".join(result['exception_day']) + "\n"
-    
-    # 请假人员
-    if result.get('on_leave'):
-        content += f"\n🏖️ **请假人员** ({len(result['on_leave'])} 人):\n"
-        content += "  " + "、".join(result['on_leave']) + "\n"
-    
-    # 未填写人员列表
-    if result['not_filled']:
-        content += f"\n❗ **需要提醒的人员:**\n"
-        for name in result['not_filled']:
-            content += f"  • {name}\n"
-    
-    content += f"\n⏰ 检查时间: {datetime.now(pytz.timezone('Asia/Shanghai')).strftime('%Y-%m-%d %H:%M:%S')}"
-    
-    card = CardBuilder.create_reminder_card(
-        title=f"📊 工时填写情况 - {date}",
-        content=content,
-        footer=f"填写率: {result['fill_rate']:.1%}",
-        button_text="",
-        button_url="",
-        template_color=color
-    )
     
     return card
 

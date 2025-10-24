@@ -1,29 +1,9 @@
-# 自定义项目名称，影响镜像命名
-name: agent2im
+# Docker Compose 配置 - 定时任务调度器
+# 使用方法: docker-compose -f docker/docker-compose.scheduler.yml up -d
+
+name: agent2im-scheduler
 
 services:
-  # AI即时通讯集成服务 - API服务（可选）
-  # app:
-  #   build:
-  #     context: ../
-  #     dockerfile: docker/Dockerfile
-  #   container_name: agent2im-api
-  #   ports:
-  #     - "9000:9000"  # API服务端口
-  #   environment:
-  #     - PYTHONPATH=/app/backend
-  #     - PYTHONUNBUFFERED=1
-  #   restart: unless-stopped
-  #   networks:
-  #     - agent2im-network
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:9000/"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 3
-  #     start_period: 40s
-
-  # 定时任务调度器
   scheduler:
     build:
       context: ../
@@ -41,11 +21,11 @@ services:
       - ../backend/config/people.json:/app/backend/config/people.json:ro
       - ../backend/config/task.json:/app/backend/config/task.json:ro
       - ../backend/config/message.json:/app/backend/config/message.json:ro
-      # 挂载日志目录（可选）
+      # 挂载日志目录（可选，方便查看日志）
       - ./logs:/app/logs
     restart: unless-stopped
     networks:
-      - agent2im-network
+      - scheduler-network
     healthcheck:
       test: ["CMD", "pgrep", "-f", "start_unified_scheduler.py"]
       interval: 60s
@@ -59,9 +39,8 @@ services:
         max-file: "3"
 
 networks:
-  agent2im-network:
+  scheduler-network:
     driver: bridge
 
-volumes:
-  agent2im_data:
-    driver: local
+
+

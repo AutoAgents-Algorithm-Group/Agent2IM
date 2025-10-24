@@ -560,11 +560,35 @@ class BitableAPI:
             }
         
         try:
+            # 先获取最近的所有记录来建立user_id映射（用于@功能）
+            print("🔍 正在获取用户ID映射...")
+            all_recent_records = self.get_records(page_size=500)  # 获取最近500条记录来建立映射
+            user_id_map = {}  # 存储姓名到user_id的映射
+            
+            for record in all_recent_records:
+                fields = record.get('fields', {})
+                user_info = fields.get(user_field, {})
+                
+                # 提取user_id
+                if isinstance(user_info, dict):
+                    user_name = user_info.get('name', '')
+                    user_id = user_info.get('id', '')
+                    if user_name and user_id and user_name not in user_id_map:
+                        user_id_map[user_name] = user_id
+                elif isinstance(user_info, list) and len(user_info) > 0:
+                    user_name = user_info[0].get('name', '') if isinstance(user_info[0], dict) else ''
+                    user_id = user_info[0].get('id', '') if isinstance(user_info[0], dict) else ''
+                    if user_name and user_id and user_name not in user_id_map:
+                        user_id_map[user_name] = user_id
+            
+            print(f"✅ 已建立 {len(user_id_map)} 个用户的ID映射")
+            
             # 获取指定日期的所有记录
             records = self.get_records_by_date("记录时间", date_str, convert_timestamp=False)
             
             # 提取已填写的人员姓名
             filled_users = set()
+            
             for record in records:
                 fields = record.get('fields', {})
                 user_info = fields.get(user_field, {})
@@ -572,6 +596,8 @@ class BitableAPI:
                 # 处理不同的用户字段格式
                 if isinstance(user_info, dict):
                     user_name = user_info.get('name', '')
+                elif isinstance(user_info, list) and len(user_info) > 0:
+                    user_name = user_info[0].get('name', '') if isinstance(user_info[0], dict) else str(user_info[0])
                 elif isinstance(user_info, str):
                     user_name = user_info
                 else:
@@ -583,6 +609,14 @@ class BitableAPI:
             # 计算已填写和未填写的人员
             filled = [name for name in user_names if name in filled_users]
             not_filled = [name for name in user_names if name not in filled_users]
+            
+            # 为未填写人员查找user_id（如果有的话）
+            not_filled_with_id = []
+            for name in not_filled:
+                not_filled_with_id.append({
+                    'name': name,
+                    'user_id': user_id_map.get(name, '')
+                })
             fill_rate = len(filled) / len(user_names) if user_names else 0.0
             all_filled = len(not_filled) == 0
             
@@ -608,6 +642,7 @@ class BitableAPI:
                 'all_filled': all_filled,
                 'filled': filled,
                 'not_filled': not_filled,
+                'not_filled_with_id': not_filled_with_id,  # 包含user_id的未填写人员
                 'on_leave': on_leave,
                 'exception_day': exception_day,
                 'is_holiday': is_holiday,

@@ -1,7 +1,29 @@
+# Web Framework
 fastapi
 uvicorn
-requests
 pydantic
-autoagents-core
+
+# HTTP and Network
+requests
+
+# Time and Scheduling
 pytz
 apscheduler
+schedule
+
+# AI Services
+autoagents-core
+autoagentsai
+
+# Data Processing and Scraping
+beautifulsoup4
+lxml
+playwright
+tqdm
+
+# Database
+supabase
+
+# Configuration
+PyYAML
+python-dotenv

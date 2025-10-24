@@ -1,0 +1,39 @@
+{
+  "timezone": "Asia/Shanghai",
+  "tasks": [
+    {
+      "id": "news_daily",
+      "name": "每日AI新闻推送",
+      "type": "news",
+      "enabled": false,
+      "schedule": "09:00",
+      "description": "每天早上9点推送AI新闻到配置的飞书群组（已禁用）"
+    },
+    {
+      "id": "labor_evening_first",
+      "name": "工时检查 - 晚上9点",
+      "type": "labor_hour",
+      "enabled": true,
+      "schedule": "21:00",
+      "description": "晚上9点检查当天工时填写情况"
+    },
+    {
+      "id": "labor_evening_second",
+      "name": "工时检查 - 晚上11点",
+      "type": "labor_hour",
+      "enabled": true,
+      "schedule": "23:00",
+      "description": "晚上11点再次检查当天工时填写情况"
+    },
+    {
+      "id": "labor_morning_makeup",
+      "name": "工时检查 - 早上10点补填提醒",
+      "type": "labor_hour",
+      "enabled": true,
+      "schedule": "10:00",
+      "check_date": "yesterday",
+      "description": "早上10点检查昨天工时填写情况"
+    }
+  ]
+}
+
