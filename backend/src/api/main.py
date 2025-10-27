@@ -136,6 +136,12 @@ def read_root():
     }
 
 
+@app.get("/health")
+def health_check():
+    """健康检查接口"""
+    return {"status": "ok"}
+
+
 @app.get("/scheduler/status")
 def scheduler_status():
     """获取定时任务调度器状态"""
