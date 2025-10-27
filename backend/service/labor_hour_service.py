@@ -122,27 +122,17 @@ class LaborHourPublisher:
         # 构建卡片元素
         elements = []
         
-        # 统计信息 - 简洁显示
+        # 统计信息和提示文案合并
         total = len(result['filled']) + len(result['not_filled'])
         filled = len(result['filled'])
         
-        elements.append({
-            "tag": "div",
-            "text": {
-                "content": f"**{filled}/{total} 人已填写工时**",
-                "tag": "lark_md"
-            }
-        })
-        
         # 未填写人员列表 - 使用@功能
         if result['not_filled']:
-            elements.append({"tag": "hr"})
-            
-            # 添加提示文案
+            # 添加合并的提示文案
             elements.append({
                 "tag": "div",
                 "text": {
-                    "content": "**请以下同学尽快填写工时:**",
+                    "content": f"**[已填写{filled}/{total}人] 请以下同学尽快填写工时:**",
                     "tag": "lark_md"
                 }
             })
@@ -170,6 +160,15 @@ class LaborHourPublisher:
                     "tag": "lark_md"
                 }
             })
+        else:
+            # 全部已填写
+            elements.append({
+                "tag": "div",
+                "text": {
+                    "content": f"**[已填写{filled}/{total}人] 所有同学都已填写工时**",
+                    "tag": "lark_md"
+                }
+            })
         
         # 例外日期和请假人员（如果有）
         extra_info = []
@@ -188,21 +187,11 @@ class LaborHourPublisher:
                 }
             })
         
-        # 添加检查时间
-        elements.append({"tag": "hr"})
-        elements.append({
-            "tag": "div",
-            "text": {
-                "content": f"检查时间: {datetime.now(pytz.timezone('Asia/Shanghai')).strftime('%Y-%m-%d %H:%M:%S')}",
-                "tag": "lark_md"
-            }
-        })
-        
-        # 添加底部按钮 - 链接到多维表格
+        # 添加底部按钮 - 链接到多维表格（更宽）
         if bitable_url:
+            elements.append({"tag": "hr"})
             elements.append({
                 "tag": "action",
-                "layout": "bisected",
                 "actions": [
                     {
                         "tag": "button",
@@ -211,7 +200,9 @@ class LaborHourPublisher:
                             "tag": "plain_text"
                         },
                         "url": bitable_url,
-                        "type": "primary"
+                        "type": "primary",
+                        "width": "default",
+                        "size": "medium"
                     }
                 ]
             })
