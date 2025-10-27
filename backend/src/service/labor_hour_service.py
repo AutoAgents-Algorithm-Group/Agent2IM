@@ -22,6 +22,8 @@ import os
 from src.utils.feishu.client import FeishuClient
 from src.utils.feishu.bitable import BitableAPI
 from src.utils.feishu.card import CardBuilder
+from src.utils.logging import set_stage
+from src.models import Stage
 
 
 class LaborHourChecker:
@@ -37,6 +39,9 @@ class LaborHourChecker:
             bitable_url: 多维表格URL
             leave_approval_code: 请假审批定义编码（可选，用于自动检测请假状态）
         """
+        # 初始化日志
+        self.log = set_stage(Stage.LABOR_CHECK)
+        
         self.app_id = app_id
         self.app_secret = app_secret
         self.bitable_url = bitable_url
@@ -52,7 +57,7 @@ class LaborHourChecker:
             leave_approval_code=leave_approval_code
         )
         
-        print(f"✅ 工时检查器初始化成功")
+        self.log.success("✅ 工时检查器初始化成功")
     
     def get_bitable_url(self) -> str:
         """获取多维表格URL"""
@@ -73,7 +78,7 @@ class LaborHourChecker:
             now = datetime.now(tz)
             date_str = now.strftime('%Y-%m-%d')
         
-        print(f"🔍 正在检查 {date_str} 的工时填写情况...")
+        self.log.info(f"🔍 正在检查 {date_str} 的工时填写情况...")
         
         result = self.bitable.check_users_filled(date_str=date_str)
         
@@ -108,7 +113,7 @@ class LaborHourChecker:
         # 计算周一日期
         start_date = end_date - timedelta(days=4)  # 周一到周五是4天差
         
-        print(f"📊 正在检查 {start_date.strftime('%Y-%m-%d')} 至 {end_date_str} 的工时填写情况...")
+        self.log.info(f"📊 正在检查 {start_date.strftime('%Y-%m-%d')} 至 {end_date_str} 的工时填写情况...")
         
         # 检查每一天的填写情况
         daily_results = {}
@@ -175,7 +180,7 @@ class LaborHourChecker:
             'never_filled_count': len(never_filled_users)
         }
         
-        print(f"✅ 周总结完成: {total_work_days} 个工作日, {len(all_users)} 人, 全勤 {len(perfect_users)} 人")
+        self.log.success(f"✅ 周总结完成: {total_work_days} 个工作日, {len(all_users)} 人, 全勤 {len(perfect_users)} 人")
         
         return summary
 
@@ -191,10 +196,19 @@ class LaborHourPublisher:
             webhook_url: 飞书群机器人 webhook URL
             webhook_secret: 飞书群机器人密钥
         """
+        # 初始化日志
+        self.log = set_stage(Stage.MESSAGE_SEND)
+        
         self.webhook_url = webhook_url
         self.webhook_secret = webhook_secret
         
-        print(f"✅ 工时发布器初始化成功")
+        # hero.jpg 图片的路径（相对于此文件）
+        self.hero_image_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            'hero.jpg'
+        )
+        
+        self.log.success(f"✅ 工时发布器初始化成功")
     
     def generate_signature(self) -> tuple:
         """生成飞书API签名（如果配置了secret）"""
@@ -225,8 +239,27 @@ class LaborHourPublisher:
         else:
             header_template = "red"
         
+        # 将日期格式转换为 YYYY/MM/DD
+        date_formatted = date.replace('-', '/')
+        
         # 构建卡片元素
         elements = []
+        
+        # 添加头图
+        # 注意：需要将 hero.jpg 上传到图床，或使用飞书图片 URL
+        # 临时使用文本替代，等待配置图片 URL
+        hero_image_url = "https://your-image-host.com/hero.jpg"  # 请替换为实际的图片 URL
+        
+        elements.append({
+            "tag": "img",
+            "img_key": hero_image_url,
+            "alt": {
+                "tag": "plain_text",
+                "content": "「本周精选」新鲜出炉，等你来品鉴！"
+            },
+            "mode": "fit_horizontal",
+            "preview": True
+        })
         
         # 统计信息和提示文案合并
         total = len(result['filled']) + len(result['not_filled'])
@@ -323,7 +356,7 @@ class LaborHourPublisher:
                 "header": {
                     "template": header_template,
                     "title": {
-                        "content": f"📮 工时速递｜{date}",
+                        "content": f"📮 工时速递｜{date_formatted}",
                         "tag": "plain_text"
                     }
                 },
@@ -530,10 +563,10 @@ class LaborHourPublisher:
                     "sign": sign,
                     **card
                 }
-                print(f"🔐 使用签名验证发送消息")
+                self.log.info(f"🔐 使用签名验证发送消息")
             else:
                 data = card
-                print(f"📤 不使用签名验证发送消息")
+                self.log.info(f"📤 不使用签名验证发送消息")
             
             headers = {"Content-Type": "application/json"}
             
@@ -542,35 +575,35 @@ class LaborHourPublisher:
             # 解析响应内容
             try:
                 response_data = response.json()
-                print(f"📋 飞书响应: {response_data}")
+                self.log.info(f"📋 飞书响应: {response_data}")
             except:
-                print(f"📋 原始响应: {response.text}")
+                self.log.info(f"📋 原始响应: {response.text}")
             
             if response.status_code == 200:
                 # 检查飞书的业务状态码
                 if response_data.get('code') == 0:
-                    print(f"✅ 工时检查结果发送成功")
+                    self.log.success(f"✅ 工时检查结果发送成功")
                 else:
-                    print(f"❌ 飞书返回错误: code={response_data.get('code')}, msg={response_data.get('msg')}")
+                    self.log.error(f"❌ 飞书返回错误: code={response_data.get('code')}, msg={response_data.get('msg')}")
             else:
-                print(f"❌ HTTP请求失败: {response.status_code}, {response.text}")
+                self.log.error(f"❌ HTTP请求失败: {response.status_code}, {response.text}")
             
             return response
             
         except Exception as e:
-            print(f"❌ 发送卡片时发生错误: {e}")
+            self.log.error(f"❌ 发送卡片时发生错误: {e}")
             raise e
     
     def publish_check_result(self, result: Dict[str, Any], date: str, bitable_url: str = None) -> Optional[requests.Response]:
         """发布工时检查结果，如果是节假日或全部已填写则不发送"""
         # 如果是节假日，不发送消息
         if result.get('is_holiday'):
-            print(f"📅 {date} 是节假日，跳过发送消息")
+            self.log.info(f"📅 {date} 是节假日，跳过发送消息")
             return None
         
         # 如果所有人都已填写，不发送消息
         if not result.get('not_filled'):
-            print(f"✅ 所有人都已填写工时，跳过发送消息")
+            self.log.success(f"✅ 所有人都已填写工时，跳过发送消息")
             return None
         
         # 创建并发送卡片
@@ -599,10 +632,13 @@ class LaborHourService:
             webhook_secret: 群机器人密钥
             leave_approval_code: 请假审批定义编码（可选，用于自动检测请假状态）
         """
+        # 初始化日志
+        self.log = set_stage(Stage.LABOR_CHECK)
+        
         self.checker = LaborHourChecker(app_id, app_secret, bitable_url, leave_approval_code)
         self.publisher = LaborHourPublisher(webhook_url, webhook_secret)
         
-        print(f"🚀 工时检查服务初始化完成")
+        self.log.success(f"🚀 工时检查服务初始化完成")
     
     def run_check_and_publish(self, date_str: str = None) -> Dict[str, Any]:
         """
@@ -614,8 +650,8 @@ class LaborHourService:
         Returns:
             检查结果
         """
-        print("=" * 80)
-        print(f"🚀 开始执行工时检查")
+        self.log.info("=" * 80)
+        self.log.info(f"🚀 开始执行工时检查")
         
         # 获取检查日期
         if not date_str:
@@ -623,7 +659,7 @@ class LaborHourService:
             now = datetime.now(tz)
             date_str = now.strftime('%Y-%m-%d')
         
-        print(f"   检查日期: {date_str}")
+        self.log.info(f"   检查日期: {date_str}")
         
         try:
             # 1. 检查工时填写情况
@@ -631,9 +667,9 @@ class LaborHourService:
             
             # 2. 打印结果
             if result.get('is_holiday'):
-                print(f"\n📅 {date_str} 是节假日，无需检查工时填写，跳过发送")
-                print(f"\n✅ 工时检查完成")
-                print("=" * 80)
+                self.log.info(f"\n📅 {date_str} 是节假日，无需检查工时填写，跳过发送")
+                self.log.info(f"\n✅ 工时检查完成")
+                self.log.info("=" * 80)
                 
                 return {
                     "status": "success",
@@ -643,17 +679,17 @@ class LaborHourService:
                     "reason": "holiday"
                 }
             
-            print(f"\n📊 检查结果:")
-            print(f"   应填写人数: {len(result['filled']) + len(result['not_filled'])}")
-            print(f"   已填写: {len(result['filled'])} 人")
-            print(f"   未填写: {len(result['not_filled'])} 人")
-            print(f"   填写率: {result['fill_rate']:.1%}")
+            self.log.info(f"\n📊 检查结果:")
+            self.log.info(f"   应填写人数: {len(result['filled']) + len(result['not_filled'])}")
+            self.log.info(f"   已填写: {len(result['filled'])} 人")
+            self.log.info(f"   未填写: {len(result['not_filled'])} 人")
+            self.log.info(f"   填写率: {result['fill_rate']:.1%}")
             
             # 如果所有人都已填写，跳过发送
             if not result.get('not_filled'):
-                print(f"\n✅ 所有人都已填写工时，跳过发送消息")
-                print(f"\n✅ 工时检查完成")
-                print("=" * 80)
+                self.log.info(f"\n✅ 所有人都已填写工时，跳过发送消息")
+                self.log.info(f"\n✅ 工时检查完成")
+                self.log.info("=" * 80)
                 
                 return {
                     "status": "success",
@@ -664,13 +700,13 @@ class LaborHourService:
                 }
             
             # 3. 发布到飞书群组
-            print(f"\n📤 正在发送结果到飞书群组...")
+            self.log.info(f"\n📤 正在发送结果到飞书群组...")
             bitable_url = self.checker.get_bitable_url()
-            print(f"   Bitable URL: {bitable_url}")
+            self.log.info(f"   Bitable URL: {bitable_url}")
             response = self.publisher.publish_check_result(result, date_str, bitable_url)
             
-            print(f"\n✅ 工时检查完成")
-            print("=" * 80)
+            self.log.info(f"\n✅ 工时检查完成")
+            self.log.info("=" * 80)
             
             return {
                 "status": "success",
@@ -680,8 +716,8 @@ class LaborHourService:
             }
             
         except Exception as e:
-            print(f"\n❌ 工时检查失败: {e}")
-            print("=" * 80)
+            self.log.info(f"\n❌ 工时检查失败: {e}")
+            self.log.info("=" * 80)
             import traceback
             traceback.print_exc()
             
@@ -701,29 +737,29 @@ class LaborHourService:
         Returns:
             周总结结果
         """
-        print("=" * 80)
-        print(f"🚀 开始执行周总结")
+        self.log.info("=" * 80)
+        self.log.info(f"🚀 开始执行周总结")
         
         try:
             # 1. 检查周总结
             summary = self.checker.check_week_summary(end_date_str)
             
             # 2. 打印结果
-            print(f"\n📊 周总结:")
-            print(f"   周期: {summary['start_date']} ~ {summary['end_date']}")
-            print(f"   工作日: {summary['total_work_days']} 天")
-            print(f"   总人数: {summary['total_users']} 人")
-            print(f"   全勤: {summary['perfect_count']} 人")
-            print(f"   部分填写: {summary['partial_count']} 人")
-            print(f"   完全未填写: {summary['never_filled_count']} 人")
+            self.log.info(f"\n📊 周总结:")
+            self.log.info(f"   周期: {summary['start_date']} ~ {summary['end_date']}")
+            self.log.info(f"   工作日: {summary['total_work_days']} 天")
+            self.log.info(f"   总人数: {summary['total_users']} 人")
+            self.log.info(f"   全勤: {summary['perfect_count']} 人")
+            self.log.info(f"   部分填写: {summary['partial_count']} 人")
+            self.log.info(f"   完全未填写: {summary['never_filled_count']} 人")
             
             # 3. 发布到飞书群组
-            print(f"\n📤 正在发送周总结到飞书群组...")
+            self.log.info(f"\n📤 正在发送周总结到飞书群组...")
             bitable_url = self.checker.get_bitable_url()
             response = self.publisher.publish_week_summary(summary, bitable_url)
             
-            print(f"\n✅ 周总结完成")
-            print("=" * 80)
+            self.log.info(f"\n✅ 周总结完成")
+            self.log.info("=" * 80)
             
             return {
                 "status": "success",
@@ -732,8 +768,8 @@ class LaborHourService:
             }
             
         except Exception as e:
-            print(f"\n❌ 周总结失败: {e}")
-            print("=" * 80)
+            self.log.info(f"\n❌ 周总结失败: {e}")
+            self.log.info("=" * 80)
             import traceback
             traceback.print_exc()
             
@@ -752,6 +788,8 @@ def run_labor_hour_check_from_config(date_str: str = None):
     
     配置文件路径: backend/src/config/labor_hour.json
     """
+    log = set_stage(Stage.CONFIG)
+    
     try:
         # 读取配置文件
         # 从 src/service/ 回到 src/config/
@@ -761,8 +799,12 @@ def run_labor_hour_check_from_config(date_str: str = None):
             'labor_hour.json'
         )
         
+        log.info(f"📋 正在加载配置文件: {config_path}")
+        
         with open(config_path, 'r', encoding='utf-8') as f:
             config = json.load(f)
+        
+        log.success("✅ 配置文件加载成功")
         
         # 提取配置
         app_id = config['feishu']['app_id']
@@ -788,13 +830,11 @@ def run_labor_hour_check_from_config(date_str: str = None):
         return result
         
     except FileNotFoundError:
-        print(f"❌ 配置文件不存在: {config_path}")
-        print("💡 请创建配置文件 backend/src/config/labor_hour.json")
+        log.error(f"❌ 配置文件不存在: {config_path}")
+        log.warning("💡 请创建配置文件 backend/src/config/labor_hour.json")
         return None
     except Exception as e:
-        print(f"❌ 执行失败: {e}")
-        import traceback
-        traceback.print_exc()
+        log.exception(f"❌ 执行失败: {e}")
         return None
 
 

@@ -5,6 +5,8 @@
 
 import time
 import requests
+from src.utils.logging import set_stage
+from src.models import Stage
 
 
 class FeishuClient:
@@ -20,6 +22,9 @@ class FeishuClient:
         """
         self.app_id = app_id
         self.app_secret = app_secret
+        
+        # 初始化日志
+        self.log = set_stage(Stage.FEISHU_AUTH)
         
         # 访问令牌缓存
         self._access_token_cache = {
@@ -56,11 +61,11 @@ class FeishuClient:
                 self._access_token_cache["token"] = token
                 self._access_token_cache["expires_at"] = current_time + expires_in - 600
                 
-                print(f"✅ 获取访问令牌成功")
+                self.log.success(f"✅ 获取访问令牌成功")
                 return token
             else:
                 raise Exception(f"获取访问令牌失败: {result}")
         except Exception as e:
-            print(f"❌ 获取飞书访问令牌失败: {e}")
+            self.log.error(f"❌ 获取飞书访问令牌失败: {e}")
             raise e
 

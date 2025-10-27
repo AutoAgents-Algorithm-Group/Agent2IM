@@ -10,6 +10,8 @@ from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 from typing import Optional, List, Dict, Any
 import pytz
+from src.utils.logging import set_stage
+from src.models import Stage
 
 
 class BitableAPI:
@@ -35,6 +37,9 @@ class BitableAPI:
         """
         self.client = client
         self.leave_approval_code = leave_approval_code
+        
+        # 初始化日志
+        self.log = set_stage(Stage.BITABLE)
     
         # 如果提供了URL，优先解析URL
         if url:
@@ -126,7 +131,7 @@ class BitableAPI:
             
             return result
         except Exception as e:
-            print(f"❌ 解析URL失败: {e}")
+            self.log.error(f"❌ 解析URL失败: {e}")
             return result
     
     def get_all_records(self, view_id: str = None, convert_timestamp: bool = True):
@@ -141,7 +146,7 @@ class BitableAPI:
             所有记录的列表
         """
         if not self.app_token or not self.table_id:
-            print("❌ 缺少app_token或table_id，请在初始化时设置")
+            self.log.error("❌ 缺少app_token或table_id，请在初始化时设置")
             return []
         
         all_items = []
@@ -176,16 +181,16 @@ class BitableAPI:
                     has_more = result.get('data', {}).get('has_more', False)
                     page_token = result.get('data', {}).get('page_token')
                     
-                    print(f"  获取第 {page_num} 页，{len(items)} 条记录")
+                    self.log.debug(f"  获取第 {page_num} 页，{len(items)} 条记录")
                     
                     if not has_more:
                         break
                 else:
                     error_code = result.get("code")
                     error_msg = result.get("msg")
-                    print(f"❌ 获取多维表格记录失败")
-                    print(f"   错误代码: {error_code}")
-                    print(f"   错误信息: {error_msg}")
+                    self.log.error(f"❌ 获取多维表格记录失败")
+                    self.log.debug(f"   错误代码: {error_code}")
+                    self.log.debug(f"   错误信息: {error_msg}")
                     return []
             
             # 如果需要转换时间戳
@@ -194,11 +199,11 @@ class BitableAPI:
                     if 'fields' in item:
                         item['fields'] = self._convert_fields_timestamps(item['fields'])
             
-            print(f"✅ 获取多维表格所有记录成功，共 {len(all_items)} 条")
+            self.log.success(f"✅ 获取多维表格所有记录成功，共 {len(all_items)} 条")
             return all_items
             
         except Exception as e:
-            print(f"❌ 获取多维表格记录失败: {e}")
+            self.log.error(f"❌ 获取多维表格记录失败: {e}")
             return []
     
     def get_records(self, view_id: str = None, page_size: int = 100, convert_timestamp: bool = True):
@@ -211,7 +216,7 @@ class BitableAPI:
             convert_timestamp: 是否自动转换时间戳为日期格式，默认True
         """
         if not self.app_token or not self.table_id:
-            print("❌ 缺少app_token或table_id，请在初始化时设置")
+            self.log.error("❌ 缺少app_token或table_id，请在初始化时设置")
             return []
         
         try:
@@ -239,28 +244,28 @@ class BitableAPI:
                         if 'fields' in item:
                             item['fields'] = self._convert_fields_timestamps(item['fields'])
                 
-                print(f"✅ 获取多维表格记录成功，共 {len(items)} 条")
+                self.log.success(f"✅ 获取多维表格记录成功，共 {len(items)} 条")
                 return items
             else:
                 error_code = result.get("code")
                 error_msg = result.get("msg")
-                print(f"❌ 获取多维表格记录失败")
-                print(f"   错误代码: {error_code}")
-                print(f"   错误信息: {error_msg}")
-                print(f"   完整响应: {result}")
+                self.log.error(f"❌ 获取多维表格记录失败")
+                self.log.debug(f"   错误代码: {error_code}")
+                self.log.debug(f"   错误信息: {error_msg}")
+                self.log.debug(f"   完整响应: {result}")
                 
                 # 针对 91402 错误给出具体建议
                 if error_code == 91402:
                     print("\n💡 解决建议：")
-                    print("   1. 确认应用已开通多维表格权限（bitable:app:readonly）")
-                    print("   2. 在飞书开发平台发布应用新版本")
-                    print("   3. 在多维表格中添加此应用为协作者")
-                    print("   4. 或使用以下URL授权：")
-                    print(f"      https://open.feishu.cn/open-apis/authen/v1/authorize?app_id={self.client.app_id}&redirect_uri=https://open.feishu.cn&scope=bitable:app")
+                    self.log.info("   1. 确认应用已开通多维表格权限（bitable:app:readonly）")
+                    self.log.info("   2. 在飞书开发平台发布应用新版本")
+                    self.log.info("   3. 在多维表格中添加此应用为协作者")
+                    self.log.info("   4. 或使用以下URL授权：")
+                    self.log.debug(f"      https://open.feishu.cn/open-apis/authen/v1/authorize?app_id={self.client.app_id}&redirect_uri=https://open.feishu.cn&scope=bitable:app")
                 
                 return []
         except Exception as e:
-            print(f"❌ 获取多维表格记录失败: {e}")
+            self.log.error(f"❌ 获取多维表格记录失败: {e}")
             return []
     
     def search_records(self, field_name: str, field_value: str):
@@ -272,7 +277,7 @@ class BitableAPI:
             field_value: 要搜索的字段值
         """
         if not self.app_token or not self.table_id:
-            print("❌ 缺少app_token或table_id，请在初始化时设置")
+            self.log.error("❌ 缺少app_token或table_id，请在初始化时设置")
             return []
         
         try:
@@ -303,13 +308,13 @@ class BitableAPI:
             
             if result.get("code") == 0:
                 items = result.get('data', {}).get('items', [])
-                print(f"✅ 搜索多维表格记录成功，找到 {len(items)} 条")
+                self.log.success(f"✅ 搜索多维表格记录成功，找到 {len(items)} 条")
                 return items
             else:
-                print(f"❌ 搜索多维表格记录失败: {result}")
+                self.log.error(f"❌ 搜索多维表格记录失败: {result}")
                 return []
         except Exception as e:
-            print(f"❌ 搜索多维表格记录失败: {e}")
+            self.log.error(f"❌ 搜索多维表格记录失败: {e}")
             return []
     
     def get_records_by_date(self, date_field: str, start_date: str, end_date: str = None, convert_timestamp: bool = True):
@@ -333,7 +338,7 @@ class BitableAPI:
             records = bitable.get_records_by_date("记录时间", "2025-09-01", "2025-09-30")
         """
         if not self.app_token or not self.table_id:
-            print("❌ 缺少app_token或table_id，请在初始化时设置")
+            self.log.error("❌ 缺少app_token或table_id，请在初始化时设置")
             return []
         
         try:
@@ -368,11 +373,11 @@ class BitableAPI:
                             record['fields'] = self._convert_fields_timestamps(fields)
                         filtered_records.append(record)
             
-            print(f"✅ 根据日期筛选成功，找到 {len(filtered_records)} 条记录")
+            self.log.success(f"✅ 根据日期筛选成功，找到 {len(filtered_records)} 条记录")
             return filtered_records
             
         except Exception as e:
-            print(f"❌ 根据日期筛选记录失败: {e}")
+            self.log.error(f"❌ 根据日期筛选记录失败: {e}")
             return []
     
     @staticmethod
@@ -419,7 +424,7 @@ class BitableAPI:
                 
                 if is_holiday:
                     holiday_name = holiday_info.get('name', '周末')
-                    print(f"📅 {date_str} 是{holiday_name}，无需检查")
+                    self.log.info(f"📅 {date_str} 是{holiday_name}，无需检查")
                 
                 return is_holiday
             else:
@@ -427,7 +432,7 @@ class BitableAPI:
                 date_obj = datetime.strptime(date_str, '%Y-%m-%d')
                 is_weekend = date_obj.weekday() >= 5  # 5=周六, 6=周日
                 if is_weekend:
-                    print(f"📅 {date_str} 是周末，无需检查")
+                    self.log.info(f"📅 {date_str} 是周末，无需检查")
                 return is_weekend
                 
         except Exception as e:
@@ -435,7 +440,7 @@ class BitableAPI:
             date_obj = datetime.strptime(date_str, '%Y-%m-%d')
             is_weekend = date_obj.weekday() >= 5
             if is_weekend:
-                print(f"📅 {date_str} 是周末，无需检查")
+                self.log.info(f"📅 {date_str} 是周末，无需检查")
             return is_weekend
     
     @staticmethod
@@ -473,14 +478,14 @@ class BitableAPI:
                 # 检查例外日期
                 exceptions = person.get('exceptions', [])
                 if weekday and weekday in exceptions:
-                    print(f"  ℹ️ {person['name']} 在{weekday}无需填写（例外日期）")
+                    self.log.debug(f"  ℹ️ {person['name']} 在{weekday}无需填写（例外日期）")
                     continue
                 
                 active_people.append(person['name'])
             
             return active_people
         except Exception as e:
-            print(f"❌ 加载人员配置失败: {e}")
+            self.log.error(f"❌ 加载人员配置失败: {e}")
             return []
     
     def get_leave_users_on_date(self, date_str: str, config_path: str = None) -> tuple[set, dict]:
@@ -544,7 +549,7 @@ class BitableAPI:
             # 检查API返回的错误
             if result.get('code') != 0:
                 error_msg = result.get('msg', 'Unknown error')
-                print(f"   ⚠️ 审批API返回错误: code={result.get('code')}, msg={error_msg}")
+                self.log.debug(f"   ⚠️ 审批API返回错误: code={result.get('code')}, msg={error_msg}")
                 return set(), {}
             
             # 检查是否有审批实例编码
@@ -552,7 +557,7 @@ class BitableAPI:
             if not instance_codes:
                 return set(), {}
             
-            print(f"   📋 找到 {len(instance_codes)} 条审批记录，正在解析...")
+            self.log.debug(f"   📋 找到 {len(instance_codes)} 条审批记录，正在解析...")
             
             leave_users = set()
             id_to_name = {}  # open_id 到姓名的映射
@@ -614,7 +619,7 @@ class BitableAPI:
             return leave_users, id_to_name
             
         except Exception as e:
-            print(f"   ⚠️ 获取请假人员失败: {e}")
+            self.log.debug(f"   ⚠️ 获取请假人员失败: {e}")
             import traceback
             traceback.print_exc()
             return set(), {}
@@ -675,24 +680,24 @@ class BitableAPI:
             result = response.json()
             
             # 调试信息（生产环境可关闭）
-            # print(f"   📋 请求URL: {url}")
-            # print(f"   📋 请求参数: {json.dumps(params, ensure_ascii=False, indent=2)}")
-            # print(f"   📋 响应: {json.dumps(result, ensure_ascii=False, indent=2)}")
+            # self.log.debug(f"   📋 请求URL: {url}")
+            # self.log.debug(f"   📋 请求参数: {json.dumps(params, ensure_ascii=False, indent=2)}")
+            # self.log.debug(f"   📋 响应: {json.dumps(result, ensure_ascii=False, indent=2)}")
             
             # 检查API返回的错误
             if result.get('code') != 0:
                 error_msg = result.get('msg', 'Unknown error')
-                print(f"   ⚠️ 审批API返回错误: code={result.get('code')}, msg={error_msg}")
-                # print(f"   📋 完整响应: {json.dumps(result, ensure_ascii=False, indent=2)}")
+                self.log.debug(f"   ⚠️ 审批API返回错误: code={result.get('code')}, msg={error_msg}")
+                # self.log.debug(f"   📋 完整响应: {json.dumps(result, ensure_ascii=False, indent=2)}")
                 return False
             
             # 检查是否有审批实例编码
             instance_codes = result.get('data', {}).get('instance_code_list', [])
             if not instance_codes:
-                print(f"   ℹ️ 该用户在查询时间范围内没有审批记录")
+                self.log.debug(f"   ℹ️ 该用户在查询时间范围内没有审批记录")
                 return False  # 没有审批记录
             
-            print(f"   📋 找到 {len(instance_codes)} 条审批记录")
+            self.log.debug(f"   📋 找到 {len(instance_codes)} 条审批记录")
             
             # 遍历每个审批实例，获取详情并判断请假时间
             # 如果找到匹配的请假记录，立即返回 True
@@ -741,7 +746,7 @@ class BitableAPI:
                                     
                                     # 检查是否包含查询日期
                                     if leave_start.date() <= check_date.date() <= leave_end.date():
-                                        print(f"   ✅ 检测到请假: {leave_type} ({leave_start.date()} ~ {leave_end.date()})")
+                                        self.log.debug(f"   ✅ 检测到请假: {leave_type} ({leave_start.date()} ~ {leave_end.date()})")
                                         return True
                                         
                     except Exception as e:
@@ -754,9 +759,8 @@ class BitableAPI:
             return False  # 没有找到匹配的请假记录
             
         except Exception as e:
-            print(f"   ⚠️ 检查请假状态失败 ({user_id}): {e}")
+            self.log.debug(f"   ⚠️ 检查请假状态失败 ({user_id}): {e}")
             import traceback
-            traceback.print_exc()
             return False  # 出错时认为未请假
     
     def check_users_filled(self, user_names: list = None, date_str: str = None, user_field: str = "员工", config_path: str = None, skip_holiday_check: bool = False):
@@ -810,12 +814,12 @@ class BitableAPI:
         
         # 如果没有提供人员名单，从配置文件读取
         if user_names is None:
-            print("📋 从配置文件读取人员名单...")
-            print(f"📅 {date_str} 是{self.get_weekday_name(date_str)}")
+            self.log.info("📋 从配置文件读取人员名单...")
+            self.log.info(f"📅 {date_str} 是{self.get_weekday_name(date_str)}")
             user_names = self.load_people_from_config(config_path, date_str)
             
             if not user_names:
-                print("⚠️ 未找到有效的人员名单（所有人都请假或在例外日期）")
+                self.log.warning("⚠️ 未找到有效的人员名单（所有人都请假或在例外日期）")
                 return {
                     'all_filled': True,
                     'filled': [],
@@ -826,10 +830,10 @@ class BitableAPI:
                     'fill_rate': 1.0
                 }
             
-            print(f"✅ 需要检查 {len(user_names)} 名人员")
+            self.log.success(f"✅ 需要检查 {len(user_names)} 名人员")
         
         if not self.app_token or not self.table_id:
-            print("❌ 缺少app_token或table_id，请在初始化时设置")
+            self.log.error("❌ 缺少app_token或table_id，请在初始化时设置")
             return {
                 'all_filled': False,
                 'filled': [],
@@ -840,7 +844,7 @@ class BitableAPI:
         
         try:
             # 先获取最近的所有记录来建立user_id映射（用于@功能）
-            print("🔍 正在获取用户ID映射...")
+            self.log.info("🔍 正在获取用户ID映射...")
             all_recent_records = self.get_records(page_size=500)  # 获取最近500条记录来建立映射
             user_id_map = {}  # 存储姓名到user_id的映射
             
@@ -860,7 +864,7 @@ class BitableAPI:
                     if user_name and user_id and user_name not in user_id_map:
                         user_id_map[user_name] = user_id
             
-            print(f"✅ 已建立 {len(user_id_map)} 个用户的ID映射")
+            self.log.success(f"✅ 已建立 {len(user_id_map)} 个用户的ID映射")
             
             # 获取指定日期的所有记录
             records = self.get_records_by_date("记录时间", date_str, convert_timestamp=False)
@@ -901,15 +905,15 @@ class BitableAPI:
             
             # 输出结果
             print(f"\n📊 {date_str} 填写情况:")
-            print(f"  总人数: {len(user_names)}")
-            print(f"  已填写: {len(filled)} 人")
-            print(f"  未填写: {len(not_filled)} 人")
-            print(f"  填写率: {fill_rate*100:.1f}%")
+            self.log.debug(f"  总人数: {len(user_names)}")
+            self.log.debug(f"  已填写: {len(filled)} 人")
+            self.log.debug(f"  未填写: {len(not_filled)} 人")
+            self.log.debug(f"  填写率: {fill_rate*100:.1f}%")
             
             if not_filled:
                 print(f"\n⚠️ 未填写人员:")
                 for name in not_filled:
-                    print(f"    - {name}")
+                    self.log.debug(f"    - {name}")
             else:
                 print(f"\n✅ 所有人员都已填写！")
             
@@ -938,11 +942,11 @@ class BitableAPI:
                     for uid in leave_user_ids:
                         name = id_to_name.get(uid, f'未知[{uid[:10]}...]')
                         leave_info.append(name)
-                    print(f"   📋 请假人员({len(leave_user_ids)}人): {', '.join(leave_info)}")
+                    self.log.debug(f"   📋 请假人员({len(leave_user_ids)}人): {', '.join(leave_info)}")
                     
                     # 显示未填写人员信息
                     not_filled_names = [u.get('name') for u in not_filled_with_id]
-                    print(f"   📋 未填写人员({len(not_filled_with_id)}人): {', '.join(not_filled_names)}")
+                    self.log.debug(f"   📋 未填写人员({len(not_filled_with_id)}人): {', '.join(not_filled_names)}")
                     
                     # 批量匹配未填写人员
                     for user_info in not_filled_with_id:
@@ -950,13 +954,13 @@ class BitableAPI:
                         name = user_info.get('name')
                         if user_id and user_id in leave_user_ids:
                             on_leave_from_calendar.append(name)
-                            print(f"   ✅ 匹配成功: {name} 在 {date_str} 请假，从提醒名单中移除")
+                            self.log.debug(f"   ✅ 匹配成功: {name} 在 {date_str} 请假，从提醒名单中移除")
                     
                     if not on_leave_from_calendar:
-                        print(f"   ⚠️ 请假人员不在未填写名单中（已填写工时或不在检查范围）")
+                        self.log.debug(f"   ⚠️ 请假人员不在未填写名单中（已填写工时或不在检查范围）")
                 
                 if on_leave_from_calendar:
-                    print(f"✅ 共 {len(on_leave_from_calendar)} 人请假，已从提醒名单中移除")
+                    self.log.success(f"✅ 共 {len(on_leave_from_calendar)} 人请假，已从提醒名单中移除")
                     # 从未填写列表中移除请假人员
                     not_filled = [name for name in not_filled if name not in on_leave_from_calendar]
                     not_filled_with_id = [u for u in not_filled_with_id if u['name'] not in on_leave_from_calendar]
@@ -981,7 +985,7 @@ class BitableAPI:
             }
             
         except Exception as e:
-            print(f"❌ 检查人员填写状态失败: {e}")
+            self.log.error(f"❌ 检查人员填写状态失败: {e}")
             return {
                 'all_filled': False,
                 'filled': [],
