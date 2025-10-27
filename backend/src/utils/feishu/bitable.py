@@ -538,7 +538,6 @@ class BitableAPI:
             # 检查是否有审批实例编码
             instance_codes = result.get('data', {}).get('instance_code_list', [])
             if not instance_codes:
-                print(f"   ℹ️ {date_str} 该时间范围内没有请假审批记录")
                 return set()
             
             print(f"   📋 找到 {len(instance_codes)} 条审批记录，正在解析...")
@@ -591,7 +590,6 @@ class BitableAPI:
                                     # 检查是否包含查询日期
                                     if leave_start.date() <= check_date.date() <= leave_end.date():
                                         leave_users.add(applicant_open_id)
-                                        print(f"   ✅ {applicant_open_id[:20]}... 请假: {leave_type}")
                                         break
                                         
                     except Exception as e:
@@ -599,9 +597,6 @@ class BitableAPI:
                 
                 except Exception as e:
                     continue
-            
-            if leave_users:
-                print(f"   📊 共 {len(leave_users)} 人在 {date_str} 请假")
             
             return leave_users
             
@@ -918,13 +913,32 @@ class BitableAPI:
                 leave_user_ids = self.get_leave_users_on_date(date_str)
                 
                 if leave_user_ids:
+                    print(f"\n   🔍 开始匹配未填写人员...")
+                    
+                    # 创建 open_id 到姓名的反向映射（使用已有的 user_id_map）
+                    id_to_name = {v: k for k, v in user_id_map.items()}
+                    
+                    # 显示请假人员信息（带姓名）
+                    leave_info = []
+                    for uid in leave_user_ids:
+                        name = id_to_name.get(uid, f'未知[{uid[:10]}...]')
+                        leave_info.append(name)
+                    print(f"   📋 请假人员({len(leave_user_ids)}人): {', '.join(leave_info)}")
+                    
+                    # 显示未填写人员信息
+                    not_filled_names = [u.get('name') for u in not_filled_with_id]
+                    print(f"   📋 未填写人员({len(not_filled_with_id)}人): {', '.join(not_filled_names)}")
+                    
                     # 批量匹配未填写人员
                     for user_info in not_filled_with_id:
                         user_id = user_info.get('user_id')
                         name = user_info.get('name')
                         if user_id and user_id in leave_user_ids:
                             on_leave_from_calendar.append(name)
-                            print(f"   📅 {name} 在 {date_str} 请假")
+                            print(f"   ✅ 匹配成功: {name} 在 {date_str} 请假，从提醒名单中移除")
+                    
+                    if not on_leave_from_calendar:
+                        print(f"   ⚠️ 请假人员不在未填写名单中（已填写工时或不在检查范围）")
                 
                 if on_leave_from_calendar:
                     print(f"✅ 共 {len(on_leave_from_calendar)} 人请假，已从提醒名单中移除")
