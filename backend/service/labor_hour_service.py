@@ -114,16 +114,10 @@ class LaborHourPublisher:
         fill_rate = result['fill_rate']
         if fill_rate >= 1.0:
             header_template = "green"
-            status_emoji = "✅"
-            status_text = "太棒了！所有人都已填写工时！"
         elif fill_rate >= 0.8:
             header_template = "orange"
-            status_emoji = "⚠️"
-            status_text = f"还有 {len(result['not_filled'])} 人未填写工时"
         else:
             header_template = "red"
-            status_emoji = "❌"
-            status_text = f"还有 {len(result['not_filled'])} 人未填写工时，请尽快填写！"
         
         # 构建卡片元素
         elements = []
@@ -135,7 +129,7 @@ class LaborHourPublisher:
         elements.append({
             "tag": "div",
             "text": {
-                "content": f"{status_emoji} **{filled}/{total} 人已填写工时**",
+                "content": f"**{filled}/{total} 人已填写工时**",
                 "tag": "lark_md"
             }
         })
@@ -180,9 +174,9 @@ class LaborHourPublisher:
         # 例外日期和请假人员（如果有）
         extra_info = []
         if result.get('exception_day'):
-            extra_info.append(f"📅 例外: " + "、".join(result['exception_day']))
+            extra_info.append(f"例外: " + "、".join(result['exception_day']))
         if result.get('on_leave'):
-            extra_info.append(f"🏖️ 请假: " + "、".join(result['on_leave']))
+            extra_info.append(f"请假: " + "、".join(result['on_leave']))
         
         if extra_info:
             elements.append({"tag": "hr"})
@@ -199,7 +193,7 @@ class LaborHourPublisher:
         elements.append({
             "tag": "div",
             "text": {
-                "content": f"⏰ 检查时间: {datetime.now(pytz.timezone('Asia/Shanghai')).strftime('%Y-%m-%d %H:%M:%S')}",
+                "content": f"检查时间: {datetime.now(pytz.timezone('Asia/Shanghai')).strftime('%Y-%m-%d %H:%M:%S')}",
                 "tag": "lark_md"
             }
         })
@@ -213,7 +207,7 @@ class LaborHourPublisher:
                     {
                         "tag": "button",
                         "text": {
-                            "content": "📝 立即填写工时",
+                            "content": "立即填写工时",
                             "tag": "plain_text"
                         },
                         "url": bitable_url,
@@ -238,36 +232,6 @@ class LaborHourPublisher:
                     }
                 },
                 "elements": elements
-            }
-        }
-        
-        return card
-    
-    def create_holiday_card(self, date: str) -> Dict[str, Any]:
-        """创建节假日卡片"""
-        card = {
-            "msg_type": "interactive",
-            "card": {
-                "config": {
-                    "wide_screen_mode": True,
-                    "enable_forward": True
-                },
-                "header": {
-                    "template": "blue",
-                    "title": {
-                        "content": f"🎉 {date} 是节假日",
-                        "tag": "plain_text"
-                    }
-                },
-                "elements": [
-                    {
-                        "tag": "div",
-                        "text": {
-                            "content": "😊 今天是节假日，无需填写工时\n\n祝大家节日快乐！",
-                            "tag": "lark_md"
-                        }
-                    }
-                ]
             }
         }
         
@@ -316,13 +280,15 @@ class LaborHourPublisher:
             print(f"❌ 发送卡片时发生错误: {e}")
             raise e
     
-    def publish_check_result(self, result: Dict[str, Any], date: str, bitable_url: str = None) -> requests.Response:
-        """发布工时检查结果"""
+    def publish_check_result(self, result: Dict[str, Any], date: str, bitable_url: str = None) -> Optional[requests.Response]:
+        """发布工时检查结果，如果是节假日则不发送"""
+        # 如果是节假日，不发送消息
         if result.get('is_holiday'):
-            card = self.create_holiday_card(date)
-        else:
-            card = self.create_labor_hour_card(result, date, bitable_url)
+            print(f"📅 {date} 是节假日，跳过发送消息")
+            return None
         
+        # 创建并发送卡片
+        card = self.create_labor_hour_card(result, date, bitable_url)
         return self.send_card(card)
 
 
@@ -373,13 +339,23 @@ class LaborHourService:
             
             # 2. 打印结果
             if result.get('is_holiday'):
-                print(f"\n🎉 {date_str} 是节假日，无需检查工时填写")
-            else:
-                print(f"\n📊 检查结果:")
-                print(f"   应填写人数: {len(result['filled']) + len(result['not_filled'])}")
-                print(f"   已填写: {len(result['filled'])} 人")
-                print(f"   未填写: {len(result['not_filled'])} 人")
-                print(f"   填写率: {result['fill_rate']:.1%}")
+                print(f"\n📅 {date_str} 是节假日，无需检查工时填写，跳过发送")
+                print(f"\n✅ 工时检查完成")
+                print("=" * 80)
+                
+                return {
+                    "status": "success",
+                    "date": date_str,
+                    "result": result,
+                    "sent": False,
+                    "reason": "holiday"
+                }
+            
+            print(f"\n📊 检查结果:")
+            print(f"   应填写人数: {len(result['filled']) + len(result['not_filled'])}")
+            print(f"   已填写: {len(result['filled'])} 人")
+            print(f"   未填写: {len(result['not_filled'])} 人")
+            print(f"   填写率: {result['fill_rate']:.1%}")
             
             # 3. 发布到飞书群组
             print(f"\n📤 正在发送结果到飞书群组...")

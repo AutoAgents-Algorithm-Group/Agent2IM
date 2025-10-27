@@ -374,20 +374,14 @@ async def check_labor_hour(
 def create_labor_hour_card(result: dict, date: str, bitable_url: str = None) -> dict:
     """创建工时填写情况卡片（美化版）"""
     
-    # 根据填写率选择颜色和状态
+    # 根据填写率选择颜色
     fill_rate = result['fill_rate']
     if fill_rate >= 1.0:
         header_template = "green"
-        status_emoji = "✅"
-        status_text = "太棒了！所有人都已填写工时！"
     elif fill_rate >= 0.8:
         header_template = "orange"
-        status_emoji = "⚠️"
-        status_text = f"还有 {len(result['not_filled'])} 人未填写工时"
     else:
         header_template = "red"
-        status_emoji = "❌"
-        status_text = f"还有 {len(result['not_filled'])} 人未填写工时，请尽快填写！"
     
     # 构建卡片元素
     elements = []
@@ -399,7 +393,7 @@ def create_labor_hour_card(result: dict, date: str, bitable_url: str = None) -> 
     elements.append({
         "tag": "div",
         "text": {
-            "content": f"{status_emoji} **{filled}/{total} 人已填写工时**",
+            "content": f"**{filled}/{total} 人已填写工时**",
             "tag": "lark_md"
         }
     })
@@ -412,7 +406,7 @@ def create_labor_hour_card(result: dict, date: str, bitable_url: str = None) -> 
         elements.append({
             "tag": "div",
             "text": {
-                "content": "❗ **请以下同学尽快填写工时:**",
+                "content": "**请以下同学尽快填写工时:**",
                 "tag": "lark_md"
             }
         })
@@ -444,9 +438,9 @@ def create_labor_hour_card(result: dict, date: str, bitable_url: str = None) -> 
     # 例外日期和请假人员（如果有）
     extra_info = []
     if result.get('exception_day'):
-        extra_info.append(f"📅 例外: " + "、".join(result['exception_day']))
+        extra_info.append(f"例外: " + "、".join(result['exception_day']))
     if result.get('on_leave'):
-        extra_info.append(f"🏖️ 请假: " + "、".join(result['on_leave']))
+        extra_info.append(f"请假: " + "、".join(result['on_leave']))
     
     if extra_info:
         elements.append({"tag": "hr"})
@@ -463,7 +457,7 @@ def create_labor_hour_card(result: dict, date: str, bitable_url: str = None) -> 
     elements.append({
         "tag": "div",
         "text": {
-            "content": f"⏰ 检查时间: {datetime.now(pytz.timezone('Asia/Shanghai')).strftime('%Y-%m-%d %H:%M:%S')}",
+            "content": f"检查时间: {datetime.now(pytz.timezone('Asia/Shanghai')).strftime('%Y-%m-%d %H:%M:%S')}",
             "tag": "lark_md"
         }
     })
@@ -477,7 +471,7 @@ def create_labor_hour_card(result: dict, date: str, bitable_url: str = None) -> 
                 {
                     "tag": "button",
                     "text": {
-                        "content": "📝 立即填写工时",
+                        "content": "立即填写工时",
                         "tag": "plain_text"
                     },
                     "url": bitable_url,
@@ -497,7 +491,7 @@ def create_labor_hour_card(result: dict, date: str, bitable_url: str = None) -> 
             "header": {
                 "template": header_template,
                 "title": {
-                    "content": f"📊 工时填写情况 - {date}",
+                    "content": f"📮 工时速递｜{date}",
                     "tag": "plain_text"
                 }
             },
