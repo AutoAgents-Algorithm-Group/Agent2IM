@@ -2,26 +2,36 @@
 name: agent2im
 
 services:
-  # AI即时通讯集成服务 - API服务（可选）
-  # app:
-  #   build:
-  #     context: ../
-  #     dockerfile: docker/Dockerfile
-  #   container_name: agent2im-api
-  #   ports:
-  #     - "9000:9000"  # API服务端口
-  #   environment:
-  #     - PYTHONPATH=/app/backend
-  #     - PYTHONUNBUFFERED=1
-  #   restart: unless-stopped
-  #   networks:
-  #     - agent2im-network
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:9000/"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 3
-  #     start_period: 40s
+  # AI即时通讯集成服务 - API服务（接收飞书事件回调）
+  api:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile
+    container_name: agent2im-api
+    ports:
+      - "9000:9000"  # API服务端口，用于接收飞书审批回调
+    environment:
+      - PYTHONPATH=/app/backend
+      - PYTHONUNBUFFERED=1
+      - TZ=Asia/Shanghai
+    volumes:
+      # 挂载配置文件（必需）
+      - ../backend/src/config/labor_hour.json:/app/backend/src/config/labor_hour.json:ro
+      - ../backend/src/config/people.json:/app/backend/src/config/people.json:ro
+    restart: unless-stopped
+    networks:
+      - agent2im-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # 定时任务调度器
   scheduler:

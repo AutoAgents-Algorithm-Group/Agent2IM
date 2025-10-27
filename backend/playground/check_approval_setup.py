@@ -196,7 +196,7 @@ class ApprovalSetupChecker:
         """检查 API 服务"""
         self.print_header("5️⃣  API 服务检查")
         
-        ports = [8000, 8080]
+        ports = [9000, 8000]  # 默认端口是 9000
         service_ok = False
         
         for port in ports:

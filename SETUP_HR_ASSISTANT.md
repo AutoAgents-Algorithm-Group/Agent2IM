@@ -81,16 +81,31 @@
 ##### 步骤 1: 配置请求地址
 
 1. 进入应用详情页 → **事件订阅** → **请求地址配置**
-2. 填写 URL: `https://your-domain.com/feishu/approval/callback`
-   
-   > 📌 替换 `your-domain.com` 为你的服务器域名
+2. 填写 URL（根据你的部署环境选择）:
+
+**方式 1: 使用 IP + 端口（开发/测试环境）**
+```
+http://your-server-ip:9000/feishu/approval/callback
+```
+
+**示例**:
+```
+http://45.78.224.30:9000/feishu/approval/callback
+```
+
+**方式 2: 使用域名 + HTTPS（生产环境推荐）**
+```
+https://your-domain.com/feishu/approval/callback
+```
 
 3. 点击「保存」
 
 > ⚠️ 注意：
-> - 必须使用 **HTTPS**
-> - 端口如果不是 443，需要加上端口号，如 `https://your-domain.com:8000/feishu/approval/callback`
+> - **生产环境强烈建议使用 HTTPS**（飞书可能会限制 HTTP）
+> - 默认端口是 **9000**
+> - 使用 IP 访问时必须指定端口号
 > - 首次保存时，飞书会发送验证请求，确保服务已启动
+> - 如果使用防火墙，确保 **9000 端口**已开放
 
 ##### 步骤 2: 订阅事件
 

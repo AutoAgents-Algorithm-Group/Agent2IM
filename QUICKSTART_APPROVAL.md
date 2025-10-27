@@ -55,8 +55,19 @@
 
 在飞书开放平台 → 你的应用 → **事件订阅**:
 
-1. **请求地址**: `https://your-domain.com/feishu/approval/callback`
-   > 替换为你的服务器地址
+1. **请求地址**: 
+   ```
+   # 开发/测试环境（使用 IP）
+   http://your-server-ip:9000/feishu/approval/callback
+   
+   # 示例
+   http://45.78.224.30:9000/feishu/approval/callback
+   
+   # 生产环境（使用域名 + HTTPS）
+   https://your-domain.com/feishu/approval/callback
+   ```
+   
+   > ⚠️ 注意：默认端口是 **9000**，不要忘记加端口号！
 
 2. **添加事件**: 搜索并添加 `approval_instance`
 
