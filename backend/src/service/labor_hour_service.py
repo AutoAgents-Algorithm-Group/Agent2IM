@@ -230,14 +230,8 @@ class LaborHourPublisher:
     def create_labor_hour_card(self, result: Dict[str, Any], date: str, bitable_url: str = None) -> Dict[str, Any]:
         """创建工时填写情况卡片"""
         
-        # 根据填写率选择颜色
-        fill_rate = result['fill_rate']
-        if fill_rate >= 1.0:
-            header_template = "green"
-        elif fill_rate >= 0.8:
-            header_template = "orange"
-        else:
-            header_template = "red"
+        # 标题固定使用橙黄色
+        header_template = "orange"
         
         # 构建卡片元素
         elements = []
@@ -245,13 +239,13 @@ class LaborHourPublisher:
         # 添加头图
         # 注意：需要将 hero.jpg 上传到图床，或使用飞书图片 URL
         # 临时使用文本替代，等待配置图片 URL
-        hero_image_url = "img_v3_02rf_7d2304ba-f86d-42fd-87a3-f1451b53dbcg"  # 请替换为实际的图片 URL
+        hero_image_url = "img_v3_02rf_5400b8c7-2b04-48d5-a995-7ee4f343b28g"  # 请替换为实际的图片 URL
         
         elements.append({
             "tag": "img",
             "img_key": hero_image_url,
             "mode": "fit_horizontal",
-            "preview": True
+            "preview": False
         })
         
         # 统计信息和提示文案合并
@@ -349,7 +343,7 @@ class LaborHourPublisher:
                 "header": {
                     "template": header_template,
                     "title": {
-                        "content": f"工时速递｜{date}",
+                        "content": f"📮 工时速递｜{date}",
                         "tag": "plain_text"
                     }
                 },
