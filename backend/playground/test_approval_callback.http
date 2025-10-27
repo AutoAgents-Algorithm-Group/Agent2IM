@@ -1,0 +1,289 @@
+### HR 小助手 - 审批回调接口测试
+### 使用方法: 在 VSCode 中安装 REST Client 插件，点击 "Send Request" 发送请求
+
+# 配置变量
+@host = http://localhost:9000
+@remote_host = http://45.78.224.30:9000
+
+###############################################################################
+# 1. 健康检查
+###############################################################################
+
+### 1.1 本地健康检查
+GET {{host}}/health
+
+### 1.2 远程健康检查
+GET {{remote_host}}/health
+
+###############################################################################
+# 2. URL 验证测试（飞书首次配置时会发送）
+###############################################################################
+
+### 2.1 本地 URL 验证
+POST {{host}}/feishu/approval/callback
+Content-Type: application/json
+
+{
+  "type": "url_verification",
+  "challenge": "test_challenge_12345"
+}
+
+### 2.2 远程 URL 验证
+POST {{remote_host}}/feishu/approval/callback
+Content-Type: application/json
+
+{
+  "type": "url_verification",
+  "challenge": "test_challenge_12345"
+}
+
+###############################################################################
+# 3. 审批通过事件测试
+###############################################################################
+
+### 3.1 审批通过 - 完整事件（本地测试）
+POST {{host}}/feishu/approval/callback
+Content-Type: application/json
+
+{
+  "type": "event_callback",
+  "event_id": "test_event_001",
+  "token": "test_token",
+  "ts": "1635840000",
+  "uuid": "test_uuid_001",
+  "event": {
+    "type": "approval_instance",
+    "status": "APPROVED",
+    "approval_code": "7C468A54-8745-2245-9675-08654A59C265",
+    "instance_code": "81D31358-93AF-92C6-7425-01A5D67C4E71",
+    "user_id": "ou_9210e6e39f53c7658a5fe518783a2f3e",
+    "open_id": "ou_9210e6e39f53c7658a5fe518783a2f3e",
+    "start_time": "2025-10-27",
+    "end_time": "2025-10-28"
+  }
+}
+
+### 3.2 审批通过 - 远程测试
+POST {{remote_host}}/feishu/approval/callback
+Content-Type: application/json
+
+{
+  "type": "event_callback",
+  "event_id": "test_event_002",
+  "token": "test_token",
+  "ts": "1635840000",
+  "uuid": "test_uuid_002",
+  "event": {
+    "type": "approval_instance",
+    "status": "APPROVED",
+    "approval_code": "7C468A54-8745-2245-9675-08654A59C265",
+    "instance_code": "81D31358-93AF-92C6-7425-01A5D67C4E72",
+    "user_id": "ou_9210e6e39f53c7658a5fe518783a2f3e",
+    "open_id": "ou_9210e6e39f53c7658a5fe518783a2f3e"
+  }
+}
+
+###############################################################################
+# 4. 审批拒绝事件测试（应该被忽略）
+###############################################################################
+
+### 4.1 审批拒绝 - 本地测试
+POST {{host}}/feishu/approval/callback
+Content-Type: application/json
+
+{
+  "type": "event_callback",
+  "event_id": "test_event_rejected_001",
+  "token": "test_token",
+  "event": {
+    "type": "approval_instance",
+    "status": "REJECTED",
+    "approval_code": "7C468A54-8745-2245-9675-08654A59C265",
+    "instance_code": "81D31358-93AF-92C6-7425-01A5D67C4E73",
+    "user_id": "ou_9210e6e39f53c7658a5fe518783a2f3e",
+    "open_id": "ou_9210e6e39f53c7658a5fe518783a2f3e"
+  }
+}
+
+###############################################################################
+# 5. 审批撤回事件测试（应该被忽略）
+###############################################################################
+
+### 5.1 审批撤回 - 本地测试
+POST {{host}}/feishu/approval/callback
+Content-Type: application/json
+
+{
+  "type": "event_callback",
+  "event_id": "test_event_canceled_001",
+  "token": "test_token",
+  "event": {
+    "type": "approval_instance",
+    "status": "CANCELED",
+    "approval_code": "7C468A54-8745-2245-9675-08654A59C265",
+    "instance_code": "81D31358-93AF-92C6-7425-01A5D67C4E74",
+    "user_id": "ou_9210e6e39f53c7658a5fe518783a2f3e",
+    "open_id": "ou_9210e6e39f53c7658a5fe518783a2f3e"
+  }
+}
+
+###############################################################################
+# 6. 真实飞书审批事件格式示例
+###############################################################################
+
+### 6.1 真实请假审批通过事件（含完整字段）
+POST {{host}}/feishu/approval/callback
+Content-Type: application/json
+
+{
+  "schema": "2.0",
+  "header": {
+    "event_id": "xxxxxxxxxxxxxxxx",
+    "event_type": "approval.approval_instance.status_changed",
+    "create_time": "1603977298000000",
+    "token": "rvaYgkND1GOiu5MM0GSWcKsBZsz7G3l5",
+    "app_id": "cli_a0f9f8xxxxxx",
+    "tenant_key": "tenant_xxxxxx"
+  },
+  "event": {
+    "type": "approval_instance",
+    "app_id": "cli_a0f9f8xxxxxx",
+    "tenant_key": "tenant_xxxxxx",
+    "approval_code": "7C468A54-8745-2245-9675-08654A59C265",
+    "instance_code": "81D31358-93AF-92C6-7425-01A5D67C4E71",
+    "status": "APPROVED",
+    "user_id": "ou_9210e6e39f53c7658a5fe518783a2f3e",
+    "open_id": "ou_9210e6e39f53c7658a5fe518783a2f3e",
+    "start_time": "1603977298",
+    "end_time": "1603977398"
+  }
+}
+
+###############################################################################
+# 7. 错误格式测试
+###############################################################################
+
+### 7.1 空请求体
+POST {{host}}/feishu/approval/callback
+Content-Type: application/json
+
+{}
+
+### 7.2 缺少 type 字段
+POST {{host}}/feishu/approval/callback
+Content-Type: application/json
+
+{
+  "event_id": "test_event_no_type",
+  "event": {
+    "status": "APPROVED"
+  }
+}
+
+### 7.3 无效的 JSON
+POST {{host}}/feishu/approval/callback
+Content-Type: application/json
+
+{
+  "type": "event_callback",
+  "invalid json here
+
+###############################################################################
+# 8. 并发测试（幂等性验证）
+###############################################################################
+
+### 8.1 相同 event_id 的重复请求（第一次）
+POST {{host}}/feishu/approval/callback
+Content-Type: application/json
+
+{
+  "type": "event_callback",
+  "event_id": "duplicate_test_001",
+  "event": {
+    "type": "approval_instance",
+    "status": "APPROVED",
+    "approval_code": "TEST_CODE",
+    "instance_code": "TEST_INSTANCE",
+    "user_id": "ou_test_user",
+    "open_id": "ou_test_user"
+  }
+}
+
+### 8.2 相同 event_id 的重复请求（第二次，应该被忽略）
+POST {{host}}/feishu/approval/callback
+Content-Type: application/json
+
+{
+  "type": "event_callback",
+  "event_id": "duplicate_test_001",
+  "event": {
+    "type": "approval_instance",
+    "status": "APPROVED",
+    "approval_code": "TEST_CODE",
+    "instance_code": "TEST_INSTANCE",
+    "user_id": "ou_test_user",
+    "open_id": "ou_test_user"
+  }
+}
+
+###############################################################################
+# 9. 性能测试
+###############################################################################
+
+### 9.1 快速响应测试（应该在 3 秒内返回）
+POST {{host}}/feishu/approval/callback
+Content-Type: application/json
+
+{
+  "type": "event_callback",
+  "event_id": "performance_test_001",
+  "event": {
+    "type": "approval_instance",
+    "status": "APPROVED",
+    "approval_code": "PERF_TEST",
+    "instance_code": "PERF_INSTANCE",
+    "user_id": "ou_perf_test",
+    "open_id": "ou_perf_test"
+  }
+}
+
+###############################################################################
+# 10. 其他接口测试
+###############################################################################
+
+### 10.1 获取根路径信息
+GET {{host}}/
+
+### 10.2 获取调度器状态
+GET {{host}}/scheduler/status
+
+### 10.3 获取调度器任务列表
+GET {{host}}/scheduler/jobs
+
+### 10.4 查看 API 文档
+GET {{host}}/docs
+
+###############################################################################
+# 测试说明
+###############################################################################
+
+# 测试顺序建议:
+# 1. 先测试健康检查 (1.1)
+# 2. 测试 URL 验证 (2.1)
+# 3. 测试审批通过事件 (3.1)
+# 4. 测试审批拒绝事件 (4.1) - 确认被正确忽略
+# 5. 测试幂等性 (8.1, 8.2) - 确认相同事件不会重复处理
+
+# 预期结果:
+# - 健康检查: {"status":"ok"}
+# - URL 验证: {"challenge":"test_challenge_12345"}
+# - 审批通过: {"code":0,"msg":"success"}
+# - 审批拒绝: {"code":0,"msg":"success"} (但日志显示被跳过)
+# - 幂等性: 第二次请求应该显示 "事件已处理过，跳过"
+
+# 注意事项:
+# 1. 本地测试使用 {{host}} 变量
+# 2. 远程测试使用 {{remote_host}} 变量（需要修改 IP）
+# 3. 测试前确保服务已启动: docker compose -f docker/docker-compose.yml ps
+# 4. 查看日志: docker compose -f docker/docker-compose.yml logs -f api
+
