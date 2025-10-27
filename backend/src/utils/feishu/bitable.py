@@ -5,10 +5,11 @@
 import re
 import json
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
-from typing import Optional
+from typing import Optional, List, Dict, Any
+import pytz
 
 
 class BitableAPI:
@@ -480,6 +481,58 @@ class BitableAPI:
             print(f"❌ 加载人员配置失败: {e}")
             return []
     
+    def check_user_on_leave(self, user_id: str, date_str: str) -> bool:
+        """
+        检查用户在指定日期是否请假
+        
+        Args:
+            user_id: 用户 open_id
+            date_str: 日期字符串，格式 YYYY-MM-DD
+        
+        Returns:
+            bool: True 表示请假，False 表示未请假
+        """
+        try:
+            # 转换日期为时间戳
+            tz = pytz.timezone('Asia/Shanghai')
+            date = datetime.strptime(date_str, '%Y-%m-%d')
+            date = tz.localize(date)
+            
+            # 查询时间范围：当天00:00:00 到 23:59:59
+            start_timestamp = int(date.timestamp())
+            end_timestamp = int((date + timedelta(days=1)).timestamp()) - 1
+            
+            # 调用飞书日历 API 查询请假日程
+            token = self.client.get_tenant_access_token()
+            
+            url = "https://open.feishu.cn/open-apis/calendar/v4/timeoff_events"
+            
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json"
+            }
+            
+            params = {
+                "user_id_type": "open_id",
+                "user_id": user_id,
+                "start_time": str(start_timestamp),
+                "end_time": str(end_timestamp)
+            }
+            
+            response = requests.get(url, headers=headers, params=params)
+            result = response.json()
+            
+            if result.get('code') == 0:
+                events = result.get('data', {}).get('timeoff_events', [])
+                if events:
+                    return True  # 有请假事件
+            
+            return False  # 没有请假事件
+            
+        except Exception as e:
+            print(f"⚠️ 检查请假状态失败 ({user_id}): {e}")
+            return False  # 出错时认为未请假
+    
     def check_users_filled(self, user_names: list = None, date_str: str = None, user_field: str = "员工", config_path: str = None, skip_holiday_check: bool = False):
         """
         检查指定人员名单是否都填写了某日期的记录
@@ -638,12 +691,37 @@ class BitableAPI:
             on_leave = self._get_on_leave_people(config_path)
             exception_day = self._get_exception_day_people(config_path, date_str)
             
+            # 检查未填写人员中是否有人请假（从日历查询）
+            on_leave_from_calendar = []
+            if not_filled_with_id and date_str:
+                print(f"\n🔍 检查未填写人员的请假状态...")
+                for user_info in not_filled_with_id:
+                    user_id = user_info.get('user_id')
+                    name = user_info.get('name')
+                    if user_id and self.check_user_on_leave(user_id, date_str):
+                        on_leave_from_calendar.append(name)
+                        print(f"   📅 {name} 在 {date_str} 请假")
+                
+                if on_leave_from_calendar:
+                    print(f"✅ 发现 {len(on_leave_from_calendar)} 人请假")
+                    # 从未填写列表中移除请假人员
+                    not_filled = [name for name in not_filled if name not in on_leave_from_calendar]
+                    not_filled_with_id = [u for u in not_filled_with_id if u['name'] not in on_leave_from_calendar]
+                    # 重新计算填写率
+                    total_expected = len(user_names) - len(on_leave_from_calendar) - len(on_leave)
+                    fill_rate = len(filled) / total_expected if total_expected > 0 else 1.0
+                    all_filled = len(not_filled) == 0
+            
+            # 合并配置文件中的请假人员和日历中的请假人员
+            all_on_leave = list(set(on_leave + on_leave_from_calendar))
+            
             return {
                 'all_filled': all_filled,
                 'filled': filled,
                 'not_filled': not_filled,
-                'not_filled_with_id': not_filled_with_id,  # 包含user_id的未填写人员
-                'on_leave': on_leave,
+                'not_filled_with_id': not_filled_with_id,  # 包含user_id的未填写人员（已排除请假）
+                'on_leave': all_on_leave,
+                'on_leave_from_calendar': on_leave_from_calendar,  # 从日历查询到的请假人员
                 'exception_day': exception_day,
                 'is_holiday': is_holiday,
                 'fill_rate': fill_rate
