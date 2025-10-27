@@ -26,3 +26,6 @@ supabase
 # Configuration
 PyYAML
 python-dotenv
+
+# Logging
+loguru
