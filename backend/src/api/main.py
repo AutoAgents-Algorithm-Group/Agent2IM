@@ -40,8 +40,8 @@ async def startup_event():
     """应用启动时初始化定时任务"""
     global reminder_scheduler, unified_scheduler
     
-    # 获取配置文件目录
-    config_dir = PathLib(__file__).parent / "config"
+    # 获取配置文件目录 (从 src/api/ 回到 src/config/)
+    config_dir = PathLib(__file__).parent.parent / "config"
     
     # 检查是否启用统一调度器（通过环境变量控制）
     use_unified_scheduler = os.environ.get('USE_UNIFIED_SCHEDULER', 'false').lower() == 'true'
