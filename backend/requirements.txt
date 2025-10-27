@@ -13,7 +13,6 @@ schedule
 
 # AI Services
 autoagents-core
-autoagentsai
 
 # Data Processing and Scraping
 beautifulsoup4

@@ -12,7 +12,7 @@ import json
 import requests
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
-from autoagentsai.client import ChatClient
+from autoagents_core.client import ChatClient
 
 import sys
 import os
