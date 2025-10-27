@@ -33,6 +33,15 @@
       "schedule": "10:00",
       "check_date": "yesterday",
       "description": "早上10点检查昨天工时填写情况"
+    },
+    {
+      "id": "labor_week_summary",
+      "name": "工时周报 - 每周五18:00",
+      "type": "labor_week_summary",
+      "enabled": true,
+      "schedule": "cron",
+      "cron": "0 18 * * 5",
+      "description": "每周五下午6点发送本周工时总结"
     }
   ]
 }

@@ -11,9 +11,10 @@ import hmac
 import time
 import json
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 import pytz
+from collections import defaultdict
 
 import sys
 import os
@@ -72,6 +73,106 @@ class LaborHourChecker:
         result = self.bitable.check_users_filled(date_str=date_str)
         
         return result
+    
+    def check_week_summary(self, end_date_str: str = None) -> Dict[str, Any]:
+        """
+        检查一周的工时填写情况（周一至周五）
+        
+        Args:
+            end_date_str: 周五日期，格式 YYYY-MM-DD，默认为本周五
+        
+        Returns:
+            周总结字典，包含每天的填写情况和统计
+        """
+        tz = pytz.timezone('Asia/Shanghai')
+        
+        if not end_date_str:
+            # 获取本周五的日期
+            now = datetime.now(tz)
+            # 获取今天是星期几（0=周一, 6=周日）
+            weekday = now.weekday()
+            # 计算到本周五的天数差
+            days_to_friday = 4 - weekday  # 4是周五
+            friday = now + timedelta(days=days_to_friday)
+            end_date_str = friday.strftime('%Y-%m-%d')
+        
+        # 解析周五日期
+        end_date = datetime.strptime(end_date_str, '%Y-%m-%d')
+        end_date = tz.localize(end_date)
+        
+        # 计算周一日期
+        start_date = end_date - timedelta(days=4)  # 周一到周五是4天差
+        
+        print(f"📊 正在检查 {start_date.strftime('%Y-%m-%d')} 至 {end_date_str} 的工时填写情况...")
+        
+        # 检查每一天的填写情况
+        daily_results = {}
+        user_fill_count = defaultdict(int)  # 每个人填写的天数
+        user_info_map = {}  # 存储用户信息
+        total_work_days = 0
+        
+        for i in range(5):  # 周一到周五
+            date = start_date + timedelta(days=i)
+            date_str = date.strftime('%Y-%m-%d')
+            
+            result = self.bitable.check_users_filled(date_str=date_str)
+            daily_results[date_str] = result
+            
+            # 如果不是节假日，统计填写情况
+            if not result.get('is_holiday'):
+                total_work_days += 1
+                
+                # 统计每个人的填写天数
+                for name in result.get('filled', []):
+                    user_fill_count[name] += 1
+                    
+                # 收集用户信息（为了后续@人）
+                for user_info in result.get('not_filled_with_id', []):
+                    name = user_info['name']
+                    user_id = user_info.get('user_id', '')
+                    if name not in user_info_map and user_id:
+                        user_info_map[name] = user_id
+        
+        # 计算统计数据
+        all_users = set()
+        for result in daily_results.values():
+            if not result.get('is_holiday'):
+                all_users.update(result.get('filled', []))
+                all_users.update([u['name'] for u in result.get('not_filled_with_id', [])])
+        
+        # 分类用户：全勤、部分填写、完全未填写
+        perfect_users = []  # 全勤
+        partial_users = []  # 部分填写
+        never_filled_users = []  # 完全未填写
+        
+        for user in all_users:
+            fill_count = user_fill_count.get(user, 0)
+            if fill_count == total_work_days:
+                perfect_users.append(user)
+            elif fill_count > 0:
+                partial_users.append({'name': user, 'days': fill_count, 'total': total_work_days})
+            else:
+                never_filled_users.append(user)
+        
+        summary = {
+            'start_date': start_date.strftime('%Y-%m-%d'),
+            'end_date': end_date_str,
+            'total_work_days': total_work_days,
+            'daily_results': daily_results,
+            'all_users': list(all_users),
+            'perfect_users': sorted(perfect_users),
+            'partial_users': sorted(partial_users, key=lambda x: x['days'], reverse=True),
+            'never_filled_users': sorted(never_filled_users),
+            'user_info_map': user_info_map,
+            'total_users': len(all_users),
+            'perfect_count': len(perfect_users),
+            'partial_count': len(partial_users),
+            'never_filled_count': len(never_filled_users)
+        }
+        
+        print(f"✅ 周总结完成: {total_work_days} 个工作日, {len(all_users)} 人, 全勤 {len(perfect_users)} 人")
+        
+        return summary
 
 
 class LaborHourPublisher:
@@ -187,7 +288,7 @@ class LaborHourPublisher:
                 }
             })
         
-        # 添加底部按钮 - 链接到多维表格
+        # 添加底部按钮 - 链接到多维表格（更宽）
         if bitable_url:
             elements.append({"tag": "hr"})
             elements.append({
@@ -200,7 +301,9 @@ class LaborHourPublisher:
                             "tag": "plain_text"
                         },
                         "url": bitable_url,
-                        "type": "primary"
+                        "type": "primary",
+                        "width": "default",
+                        "size": "medium"
                     }
                 ]
             })
@@ -216,6 +319,191 @@ class LaborHourPublisher:
                     "template": header_template,
                     "title": {
                         "content": f"📮 工时速递｜{date}",
+                        "tag": "plain_text"
+                    }
+                },
+                "elements": elements
+            }
+        }
+        
+        return card
+    
+    def create_week_summary_card(self, summary: Dict[str, Any], bitable_url: str = None) -> Dict[str, Any]:
+        """创建周总结卡片"""
+        
+        start_date = summary['start_date']
+        end_date = summary['end_date']
+        total_work_days = summary['total_work_days']
+        perfect_users = summary['perfect_users']
+        partial_users = summary['partial_users']
+        never_filled_users = summary['never_filled_users']
+        user_info_map = summary['user_info_map']
+        
+        # 根据完成情况选择颜色
+        perfect_rate = len(perfect_users) / len(summary['all_users']) if summary['all_users'] else 0
+        if perfect_rate >= 0.8:
+            header_template = "green"
+        elif perfect_rate >= 0.5:
+            header_template = "orange"
+        else:
+            header_template = "red"
+        
+        # 构建卡片元素
+        elements = []
+        
+        # 统计概览
+        elements.append({
+            "tag": "div",
+            "text": {
+                "content": f"**本周工作日: {total_work_days} 天**\n**总人数: {summary['total_users']} 人**",
+                "tag": "lark_md"
+            }
+        })
+        
+        elements.append({"tag": "hr"})
+        
+        # 全勤人员
+        if perfect_users:
+            elements.append({
+                "tag": "div",
+                "text": {
+                    "content": f"**✅ 全勤人员 ({len(perfect_users)}人)**",
+                    "tag": "lark_md"
+                }
+            })
+            
+            # 构建全勤人员列表
+            perfect_content = "  ".join(perfect_users)
+            elements.append({
+                "tag": "div",
+                "text": {
+                    "content": perfect_content,
+                    "tag": "lark_md"
+                }
+            })
+            
+            elements.append({"tag": "hr"})
+        
+        # 部分填写人员
+        if partial_users:
+            elements.append({
+                "tag": "div",
+                "text": {
+                    "content": f"**⚠️ 部分填写人员 ({len(partial_users)}人)**",
+                    "tag": "lark_md"
+                }
+            })
+            
+            # 构建部分填写人员列表，显示填写天数
+            partial_content = ""
+            for user_info in partial_users:
+                name = user_info['name']
+                days = user_info['days']
+                total = user_info['total']
+                partial_content += f"{name}({days}/{total})  "
+            
+            elements.append({
+                "tag": "div",
+                "text": {
+                    "content": partial_content,
+                    "tag": "lark_md"
+                }
+            })
+            
+            elements.append({"tag": "hr"})
+        
+        # 完全未填写人员
+        if never_filled_users:
+            elements.append({
+                "tag": "div",
+                "text": {
+                    "content": f"**❌ 完全未填写人员 ({len(never_filled_users)}人)**",
+                    "tag": "lark_md"
+                }
+            })
+            
+            # 构建@人员的内容
+            never_filled_content = ""
+            for name in never_filled_users:
+                user_id = user_info_map.get(name, '')
+                if user_id:
+                    never_filled_content += f"<at id={user_id}></at>  "
+                else:
+                    never_filled_content += f"{name}  "
+            
+            elements.append({
+                "tag": "div",
+                "text": {
+                    "content": never_filled_content,
+                    "tag": "lark_md"
+                }
+            })
+            
+            elements.append({"tag": "hr"})
+        
+        # 每日详情
+        elements.append({
+            "tag": "div",
+            "text": {
+                "content": "**📅 每日详情**",
+                "tag": "lark_md"
+            }
+        })
+        
+        daily_results = summary['daily_results']
+        for date_str in sorted(daily_results.keys()):
+            result = daily_results[date_str]
+            date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+            weekday_name = ['周一', '周二', '周三', '周四', '周五'][date_obj.weekday()]
+            
+            if result.get('is_holiday'):
+                status = "节假日"
+                fill_info = ""
+            else:
+                filled_count = len(result.get('filled', []))
+                not_filled_count = len(result.get('not_filled', []))
+                total = filled_count + not_filled_count
+                fill_info = f" - {filled_count}/{total}人"
+            
+            elements.append({
+                "tag": "div",
+                "text": {
+                    "content": f"{weekday_name} {date_str}{fill_info if fill_info else ' - ' + status}",
+                    "tag": "lark_md"
+                }
+            })
+        
+        # 添加底部按钮
+        if bitable_url:
+            elements.append({"tag": "hr"})
+            elements.append({
+                "tag": "action",
+                "actions": [
+                    {
+                        "tag": "button",
+                        "text": {
+                            "content": "查看详细工时",
+                            "tag": "plain_text"
+                        },
+                        "url": bitable_url,
+                        "type": "primary",
+                        "width": "default",
+                        "size": "medium"
+                    }
+                ]
+            })
+        
+        card = {
+            "msg_type": "interactive",
+            "card": {
+                "config": {
+                    "wide_screen_mode": True,
+                    "enable_forward": True
+                },
+                "header": {
+                    "template": header_template,
+                    "title": {
+                        "content": f"📮 工时周报｜{start_date} ~ {end_date}",
                         "tag": "plain_text"
                     }
                 },
@@ -282,6 +570,11 @@ class LaborHourPublisher:
         
         # 创建并发送卡片
         card = self.create_labor_hour_card(result, date, bitable_url)
+        return self.send_card(card)
+    
+    def publish_week_summary(self, summary: Dict[str, Any], bitable_url: str = None) -> requests.Response:
+        """发布周总结"""
+        card = self.create_week_summary_card(summary, bitable_url)
         return self.send_card(card)
 
 
@@ -389,6 +682,57 @@ class LaborHourService:
             return {
                 "status": "error",
                 "date": date_str,
+                "message": str(e)
+            }
+    
+    def run_week_summary_and_publish(self, end_date_str: str = None) -> Dict[str, Any]:
+        """
+        运行周总结并发布
+        
+        Args:
+            end_date_str: 周五日期，格式 YYYY-MM-DD，默认为本周五
+        
+        Returns:
+            周总结结果
+        """
+        print("=" * 80)
+        print(f"🚀 开始执行周总结")
+        
+        try:
+            # 1. 检查周总结
+            summary = self.checker.check_week_summary(end_date_str)
+            
+            # 2. 打印结果
+            print(f"\n📊 周总结:")
+            print(f"   周期: {summary['start_date']} ~ {summary['end_date']}")
+            print(f"   工作日: {summary['total_work_days']} 天")
+            print(f"   总人数: {summary['total_users']} 人")
+            print(f"   全勤: {summary['perfect_count']} 人")
+            print(f"   部分填写: {summary['partial_count']} 人")
+            print(f"   完全未填写: {summary['never_filled_count']} 人")
+            
+            # 3. 发布到飞书群组
+            print(f"\n📤 正在发送周总结到飞书群组...")
+            bitable_url = self.checker.get_bitable_url()
+            response = self.publisher.publish_week_summary(summary, bitable_url)
+            
+            print(f"\n✅ 周总结完成")
+            print("=" * 80)
+            
+            return {
+                "status": "success",
+                "summary": summary,
+                "sent": response.status_code == 200 if response else False
+            }
+            
+        except Exception as e:
+            print(f"\n❌ 周总结失败: {e}")
+            print("=" * 80)
+            import traceback
+            traceback.print_exc()
+            
+            return {
+                "status": "error",
                 "message": str(e)
             }
 

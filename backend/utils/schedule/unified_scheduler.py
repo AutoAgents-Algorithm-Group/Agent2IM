@@ -16,7 +16,8 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from service.news_service import run_news_and_publish
-from service.labor_hour_service import run_labor_hour_check_from_config
+from service.labor_hour_service import run_labor_hour_check_from_config, LaborHourService
+import json as json_lib
 
 
 class UnifiedScheduler:
@@ -89,27 +90,48 @@ class UnifiedScheduler:
                 task_id = task.get("id")
                 task_name = task.get("name")
                 task_type = task.get("type")
-                schedule_time = task.get("schedule", "00:00")
-                
-                # 解析时间
-                hour, minute = map(int, schedule_time.split(":"))
+                schedule_config = task.get("schedule", "00:00")
                 
                 # 根据任务类型选择执行函数
                 if task_type == "news":
                     job_func = self.run_news_task
                 elif task_type == "labor_hour":
                     check_date = task.get("check_date", "today")
-                    job_func = lambda: self.run_labor_hour_task(check_date)
+                    job_func = lambda cd=check_date: self.run_labor_hour_task(cd)
+                elif task_type == "labor_week_summary":
+                    job_func = self.run_week_summary_task
                 else:
                     print(f"⚠️ 未知的任务类型: {task_type}")
                     continue
                 
                 # 添加定时任务
-                trigger = CronTrigger(
-                    hour=hour,
-                    minute=minute,
-                    timezone=self.timezone
-                )
+                # 处理 cron 表达式和普通时间
+                if schedule_config == "cron":
+                    # 使用cron表达式
+                    cron_expr = task.get("cron", "0 0 * * *")
+                    cron_parts = cron_expr.split()
+                    if len(cron_parts) == 5:
+                        trigger = CronTrigger(
+                            minute=cron_parts[0],
+                            hour=cron_parts[1],
+                            day=cron_parts[2],
+                            month=cron_parts[3],
+                            day_of_week=cron_parts[4],
+                            timezone=self.timezone
+                        )
+                        schedule_desc = f"cron({cron_expr})"
+                    else:
+                        print(f"⚠️ 无效的 cron 表达式: {cron_expr}")
+                        continue
+                else:
+                    # 普通时间格式 HH:MM
+                    hour, minute = map(int, schedule_config.split(":"))
+                    trigger = CronTrigger(
+                        hour=hour,
+                        minute=minute,
+                        timezone=self.timezone
+                    )
+                    schedule_desc = f"每天 {schedule_config}"
                 
                 self.scheduler.add_job(
                     job_func,
@@ -119,7 +141,7 @@ class UnifiedScheduler:
                     replace_existing=True
                 )
                 
-                print(f"✅ 已添加定时任务: {task_name} (每天 {schedule_time})")
+                print(f"✅ 已添加定时任务: {task_name} ({schedule_desc})")
             
             print(f"\n📅 共添加 {len(self.scheduler.get_jobs())} 个定时任务")
             
@@ -171,6 +193,44 @@ class UnifiedScheduler:
             
         except Exception as e:
             print(f"\n❌ 工时检查任务失败: {e}")
+            import traceback
+            traceback.print_exc()
+            print(f"{'='*80}\n")
+    
+    def run_week_summary_task(self):
+        """执行周总结任务"""
+        try:
+            print(f"\n{'='*80}")
+            print(f"⏰ 执行定时任务: 工时周报")
+            print(f"   时间: {datetime.now(pytz.timezone(self.timezone)).strftime('%Y-%m-%d %H:%M:%S')}")
+            print(f"{'='*80}\n")
+            
+            # 读取配置文件
+            config_file = self.config_dir / "labor_hour.json"
+            with open(config_file, 'r', encoding='utf-8') as f:
+                config = json_lib.load(f)
+            
+            # 创建服务实例
+            service = LaborHourService(
+                app_id=config['feishu']['app_id'],
+                app_secret=config['feishu']['app_secret'],
+                bitable_url=config['bitable']['url'],
+                webhook_url=config['webhook']['url'],
+                webhook_secret=config['webhook']['secret']
+            )
+            
+            # 运行周总结
+            result = service.run_week_summary_and_publish()
+            
+            if result and result.get('status') == 'success':
+                print(f"\n✅ 工时周报任务完成")
+            else:
+                print(f"\n⚠️ 工时周报任务完成，但可能存在问题")
+            
+            print(f"{'='*80}\n")
+            
+        except Exception as e:
+            print(f"\n❌ 工时周报任务失败: {e}")
             import traceback
             traceback.print_exc()
             print(f"{'='*80}\n")
