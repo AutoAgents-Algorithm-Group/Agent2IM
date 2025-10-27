@@ -27,7 +27,7 @@ from src.utils.feishu.card import CardBuilder
 class LaborHourChecker:
     """工时填写检查器"""
     
-    def __init__(self, app_id: str, app_secret: str, bitable_url: str):
+    def __init__(self, app_id: str, app_secret: str, bitable_url: str, leave_approval_code: str = None):
         """
         初始化工时检查器
         
@@ -35,16 +35,22 @@ class LaborHourChecker:
             app_id: 飞书应用ID
             app_secret: 飞书应用密钥
             bitable_url: 多维表格URL
+            leave_approval_code: 请假审批定义编码（可选，用于自动检测请假状态）
         """
         self.app_id = app_id
         self.app_secret = app_secret
         self.bitable_url = bitable_url
+        self.leave_approval_code = leave_approval_code
         
         # 初始化飞书客户端
         self.feishu_client = FeishuClient(app_id=app_id, app_secret=app_secret)
         
         # 初始化Bitable API
-        self.bitable = BitableAPI(client=self.feishu_client, url=bitable_url)
+        self.bitable = BitableAPI(
+            client=self.feishu_client, 
+            url=bitable_url,
+            leave_approval_code=leave_approval_code
+        )
         
         print(f"✅ 工时检查器初始化成功")
     
@@ -581,7 +587,7 @@ class LaborHourService:
     """工时检查服务 - 整合检查和发布功能"""
     
     def __init__(self, app_id: str, app_secret: str, bitable_url: str, 
-                 webhook_url: str, webhook_secret: str):
+                 webhook_url: str, webhook_secret: str, leave_approval_code: str = None):
         """
         初始化工时检查服务
         
@@ -591,8 +597,9 @@ class LaborHourService:
             bitable_url: 多维表格URL
             webhook_url: 群机器人 webhook URL
             webhook_secret: 群机器人密钥
+            leave_approval_code: 请假审批定义编码（可选，用于自动检测请假状态）
         """
-        self.checker = LaborHourChecker(app_id, app_secret, bitable_url)
+        self.checker = LaborHourChecker(app_id, app_secret, bitable_url, leave_approval_code)
         self.publisher = LaborHourPublisher(webhook_url, webhook_secret)
         
         print(f"🚀 工时检查服务初始化完成")
@@ -760,6 +767,7 @@ def run_labor_hour_check_from_config(date_str: str = None):
         # 提取配置
         app_id = config['feishu']['app_id']
         app_secret = config['feishu']['app_secret']
+        leave_approval_code = config['feishu'].get('leave_approval_code')
         bitable_url = config['bitable']['url']
         webhook_url = config['webhook']['url']
         webhook_secret = config['webhook']['secret']
@@ -770,7 +778,8 @@ def run_labor_hour_check_from_config(date_str: str = None):
             app_secret=app_secret,
             bitable_url=bitable_url,
             webhook_url=webhook_url,
-            webhook_secret=webhook_secret
+            webhook_secret=webhook_secret,
+            leave_approval_code=leave_approval_code
         )
         
         # 运行检查

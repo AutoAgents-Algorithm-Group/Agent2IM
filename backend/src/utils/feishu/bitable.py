@@ -15,7 +15,7 @@ import pytz
 class BitableAPI:
     """飞书多维表格API"""
     
-    def __init__(self, client, app_token: str = None, table_id: str = None, url: str = None):
+    def __init__(self, client, app_token: str = None, table_id: str = None, url: str = None, leave_approval_code: str = None):
         """
         初始化多维表格API
         
@@ -24,6 +24,7 @@ class BitableAPI:
             app_token: 多维表格的app_token（可选）
             table_id: 表格的table_id（可选）
             url: 飞书多维表格URL，如果提供则自动解析出app_token和table_id（可选）
+            leave_approval_code: 请假审批定义编码，用于请假检测（可选）
             
         示例:
             # 方式1: 直接传入URL（推荐）
@@ -33,6 +34,7 @@ class BitableAPI:
             >>> bitable = BitableAPI(client, app_token="UfDPbov0Eal3RpsWAEBcyfe1nAb", table_id="tbla3OuZeDczpqZx")
         """
         self.client = client
+        self.leave_approval_code = leave_approval_code
     
         # 如果提供了URL，优先解析URL
         if url:
@@ -498,9 +500,9 @@ class BitableAPI:
             check_date = datetime.strptime(date_str, '%Y-%m-%d')
             check_date = tz.localize(check_date)
             
-            # 查询时间范围：前后各7天（单位：秒）
-            start_date = check_date - timedelta(days=7)
-            end_date = check_date + timedelta(days=7)
+            # 查询时间范围：前后各30天（单位：秒）
+            start_date = check_date - timedelta(days=30)
+            end_date = check_date + timedelta(days=30)
             start_timestamp = int(start_date.timestamp())
             end_timestamp = int(end_date.timestamp())
             
@@ -514,9 +516,14 @@ class BitableAPI:
                 "Content-Type": "application/json"
             }
             
-            # 根据飞书API文档，查询审批实例不需要start_time/end_time参数
-            # 而是通过approval_code筛选，或者直接查询用户的所有审批
+            # 如果没有配置请假审批编码，跳过检查
+            if not self.leave_approval_code:
+                return False
+            
             params = {
+                "approval_code": self.leave_approval_code,
+                "start_time": str(start_timestamp),
+                "end_time": str(end_timestamp),
                 "page_size": 100,
                 "user_id": user_id,
                 "user_id_type": "open_id"
@@ -537,58 +544,68 @@ class BitableAPI:
                 # print(f"   📋 完整响应: {json.dumps(result, ensure_ascii=False, indent=2)}")
                 return False
             
-            # 检查是否有审批实例
-            instances = result.get('data', {}).get('instance_list', [])
-            if not instances:
+            # 检查是否有审批实例编码
+            instance_codes = result.get('data', {}).get('instance_code_list', [])
+            if not instance_codes:
                 return False  # 没有审批记录
             
-            # 遍历审批实例，查找已通过的请假审批
-            for instance in instances:
-                # 只处理已通过的审批
-                if instance.get('status') != 'APPROVED':
-                    continue
-                
-                # 获取审批定义编码（用于判断是否为请假审批）
-                approval_code = instance.get('approval_code', '')
-                approval_name = instance.get('approval_name', '')
-                
-                # 判断是否为请假审批（通常审批名称包含"请假"关键词）
-                if '请假' not in approval_name and 'leave' not in approval_name.lower():
-                    continue
-                
-                # 解析审批表单，获取请假时间范围
-                form = instance.get('form', {})
-                
-                # 尝试从表单中提取开始和结束时间
-                leave_start = None
-                leave_end = None
-                
-                for widget in form:
-                    widget_id = widget.get('id', '')
-                    widget_name = widget.get('name', '')
-                    widget_value = widget.get('value', '')
+            # 遍历每个审批实例，获取详情并判断请假时间
+            for instance_code in instance_codes:
+                try:
+                    # 获取审批实例详情
+                    detail_url = f"https://open.feishu.cn/open-apis/approval/v4/instances/{instance_code}"
+                    detail_params = {"user_id_type": "open_id"}
+                    detail_response = requests.get(detail_url, headers=headers, params=detail_params)
+                    detail_result = detail_response.json()
                     
-                    # 查找时间相关字段
-                    if '开始' in widget_name or 'start' in widget_name.lower():
-                        try:
-                            # 尝试解析时间戳（毫秒）
-                            if widget_value and widget_value.isdigit():
-                                leave_start = datetime.fromtimestamp(int(widget_value) / 1000, tz=tz)
-                        except:
-                            pass
+                    if detail_result.get('code') != 0:
+                        continue
                     
-                    if '结束' in widget_name or 'end' in widget_name.lower():
-                        try:
-                            if widget_value and widget_value.isdigit():
-                                leave_end = datetime.fromtimestamp(int(widget_value) / 1000, tz=tz)
-                        except:
-                            pass
+                    instance = detail_result.get('data', {})
+                    
+                    # 只处理已通过的审批
+                    if instance.get('status') != 'APPROVED':
+                        continue
+                    
+                    # 获取审批定义名称
+                    approval_name = instance.get('approval_name', '')
+                    
+                    # 解析审批表单，获取请假时间范围
+                    form = instance.get('form', [])
+                    
+                    # 尝试从表单中提取开始和结束时间
+                    leave_start = None
+                    leave_end = None
+                    
+                    for widget in form:
+                        widget_name = widget.get('name', '')
+                        widget_value = widget.get('value', '')
+                        
+                        # 查找时间相关字段
+                        if '开始' in widget_name or 'start' in widget_name.lower():
+                            try:
+                                # 尝试解析时间戳（毫秒）
+                                if widget_value and widget_value.isdigit():
+                                    leave_start = datetime.fromtimestamp(int(widget_value) / 1000, tz=tz)
+                            except:
+                                pass
+                        
+                        if '结束' in widget_name or 'end' in widget_name.lower():
+                            try:
+                                if widget_value and widget_value.isdigit():
+                                    leave_end = datetime.fromtimestamp(int(widget_value) / 1000, tz=tz)
+                            except:
+                                pass
+                    
+                    # 如果成功解析到请假时间范围，检查是否包含查询日期
+                    if leave_start and leave_end:
+                        if leave_start.date() <= check_date.date() <= leave_end.date():
+                            print(f"   ✅ 检测到请假: {approval_name} ({leave_start.date()} ~ {leave_end.date()})")
+                            return True
                 
-                # 如果成功解析到请假时间范围，检查是否包含查询日期
-                if leave_start and leave_end:
-                    if leave_start.date() <= check_date.date() <= leave_end.date():
-                        print(f"   ✅ 检测到请假: {approval_name} ({leave_start.date()} ~ {leave_end.date()})")
-                        return True
+                except Exception as e:
+                    # 单个实例查询失败，继续处理下一个
+                    continue
             
             return False  # 没有找到匹配的请假记录
             

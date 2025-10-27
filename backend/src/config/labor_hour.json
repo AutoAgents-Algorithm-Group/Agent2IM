@@ -10,7 +10,8 @@
   "feishu": {
     "_comment": "用于访问飞书多维表格API，读取工时填写数据",
     "app_id": "cli_a87352e3c577900e",
-    "app_secret": "DlVXx6WbRuDh4PnJkhZeUpjlaXcthWwY"
+    "app_secret": "DlVXx6WbRuDh4PnJkhZeUpjlaXcthWwY",
+    "leave_approval_code": "A9D489DC-5F55-4418-99F1-01E1CE734CA1"
   },
   
   "bitable": {

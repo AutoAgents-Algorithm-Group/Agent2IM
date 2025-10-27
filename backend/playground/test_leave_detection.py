@@ -46,7 +46,12 @@ def test_leave_detection(date_str=None):
     client = FeishuClient(app_id=feishu['app_id'], app_secret=feishu['app_secret'])
     
     # 创建 Bitable API
-    bitable = BitableAPI(client, url=config['bitable']['url'])
+    leave_approval_code = feishu.get('leave_approval_code')
+    bitable = BitableAPI(
+        client, 
+        url=config['bitable']['url'],
+        leave_approval_code=leave_approval_code
+    )
     
     # 确定检查日期
     if date_str is None:
