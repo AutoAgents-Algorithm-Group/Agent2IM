@@ -20,6 +20,7 @@ from src.utils.feishu.card import CardBuilder
 from src.utils.schedule import ReminderScheduler
 from src.utils.schedule.unified_scheduler import UnifiedScheduler
 from src.utils import event_manager
+from src.service.approval_service import create_approval_service_from_config
 from datetime import datetime
 import pytz
 import os
@@ -264,6 +265,69 @@ async def feishu_webhook(
             content={"status": "error", "message": str(e)}, 
             status_code=500
         )
+
+
+@app.post("/feishu/approval/callback")
+async def handle_approval_callback(request: Request):
+    """
+    飞书审批事件回调
+    
+    当审批通过时，自动创建请假日历
+    """
+    try:
+        # 获取请求体
+        body = await request.body()
+        data = json.loads(body.decode('utf-8'))
+        
+        print("=" * 80)
+        print(f"📨 收到审批事件回调")
+        print(f"   时间: {datetime.now(pytz.timezone('Asia/Shanghai')).strftime('%Y-%m-%d %H:%M:%S')}")
+        
+        # 处理URL验证请求（飞书首次配置webhook时会发送）
+        if data.get('type') == 'url_verification':
+            challenge = data.get('challenge', '')
+            print(f"✅ URL验证请求，返回challenge: {challenge}")
+            return JSONResponse(content={"challenge": challenge})
+        
+        # 处理审批事件
+        event_type = data.get('type')
+        
+        if event_type == 'event_callback':
+            # 检查事件ID是否已处理（防止重复处理）
+            event_id = data.get('event_id', '')
+            
+            if event_manager.is_processed(event_id):
+                print(f"⏭️ 事件已处理，跳过: {event_id}")
+                return JSONResponse(content={"code": 0, "msg": "success"})
+            
+            # 标记事件为已处理
+            event_manager.mark_processed(event_id)
+            
+            # 创建审批服务实例
+            approval_service = create_approval_service_from_config()
+            
+            # 处理审批事件
+            result = approval_service.handle_approval_event(data)
+            
+            print(f"📊 处理结果: {result}")
+            print("=" * 80)
+            
+            return JSONResponse(content={"code": 0, "msg": "success"})
+        
+        else:
+            print(f"⚠️ 未知的事件类型: {event_type}")
+            return JSONResponse(content={"code": 0, "msg": "unknown event type"})
+            
+    except Exception as e:
+        print(f"❌ 处理审批回调失败: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        return JSONResponse(
+            content={"code": 500, "msg": str(e)},
+            status_code=500
+        )
+
 
 @app.get("/feishu/labor_hour/{app_id}-{app_secret}/{group_chat_id}/{bitable_url:path}")
 async def check_labor_hour(
