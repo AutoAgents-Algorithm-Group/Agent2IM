@@ -483,6 +483,134 @@ class BitableAPI:
             print(f"❌ 加载人员配置失败: {e}")
             return []
     
+    def get_leave_users_on_date(self, date_str: str) -> set:
+        """
+        获取指定日期所有请假人员的 open_id 集合（一次性查询）
+        
+        Args:
+            date_str: 日期字符串，格式 YYYY-MM-DD
+        
+        Returns:
+            set: 请假人员的 open_id 集合
+        """
+        try:
+            # 转换日期为时间戳（毫秒）
+            tz = pytz.timezone('Asia/Shanghai')
+            check_date = datetime.strptime(date_str, '%Y-%m-%d')
+            check_date = tz.localize(check_date)
+            
+            # 查询时间范围：前后各7天
+            start_date = check_date - timedelta(days=7)
+            end_date = check_date + timedelta(days=7)
+            start_timestamp = int(start_date.timestamp() * 1000)
+            end_timestamp = int(end_date.timestamp() * 1000)
+            
+            # 如果没有配置请假审批编码，返回空集合
+            if not self.leave_approval_code:
+                return set()
+            
+            # 调用飞书审批 API 查询审批实例
+            token = self.client.get_access_token()
+            
+            url = "https://open.feishu.cn/open-apis/approval/v4/instances"
+            
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json"
+            }
+            
+            params = {
+                "approval_code": self.leave_approval_code,
+                "start_time": str(start_timestamp),
+                "end_time": str(end_timestamp),
+                "page_size": 100
+            }
+            
+            response = requests.get(url, headers=headers, params=params)
+            result = response.json()
+            
+            # 检查API返回的错误
+            if result.get('code') != 0:
+                error_msg = result.get('msg', 'Unknown error')
+                print(f"   ⚠️ 审批API返回错误: code={result.get('code')}, msg={error_msg}")
+                return set()
+            
+            # 检查是否有审批实例编码
+            instance_codes = result.get('data', {}).get('instance_code_list', [])
+            if not instance_codes:
+                print(f"   ℹ️ {date_str} 该时间范围内没有请假审批记录")
+                return set()
+            
+            print(f"   📋 找到 {len(instance_codes)} 条审批记录，正在解析...")
+            
+            leave_users = set()
+            
+            # 遍历每个审批实例，提取当天请假的人员
+            for instance_code in instance_codes:
+                try:
+                    # 获取审批实例详情
+                    detail_url = f"https://open.feishu.cn/open-apis/approval/v4/instances/{instance_code}"
+                    detail_params = {"user_id_type": "open_id"}
+                    detail_response = requests.get(detail_url, headers=headers, params=detail_params)
+                    detail_result = detail_response.json()
+                    
+                    if detail_result.get('code') != 0:
+                        continue
+                    
+                    instance = detail_result.get('data', {})
+                    
+                    # 只处理已通过的审批
+                    if instance.get('status') != 'APPROVED':
+                        continue
+                    
+                    # 获取申请人 open_id
+                    applicant_open_id = instance.get('open_id')
+                    
+                    # 解析审批表单（form 是 JSON 字符串）
+                    form_str = instance.get('form', '[]')
+                    try:
+                        form_data = json.loads(form_str) if isinstance(form_str, str) else form_str
+                        
+                        # 查找请假表单组件（leaveGroupV2）
+                        for widget in form_data:
+                            if widget.get('type') == 'leaveGroupV2':
+                                leave_info = widget.get('value', {})
+                                
+                                # 直接从 value 中获取请假时间
+                                start_str = leave_info.get('start', '')
+                                end_str = leave_info.get('end', '')
+                                leave_type = leave_info.get('name', '')
+                                
+                                if start_str and end_str:
+                                    # 解析 ISO 格式时间
+                                    leave_start = datetime.strptime(start_str[:19], '%Y-%m-%dT%H:%M:%S')
+                                    leave_end = datetime.strptime(end_str[:19], '%Y-%m-%dT%H:%M:%S')
+                                    leave_start = tz.localize(leave_start)
+                                    leave_end = tz.localize(leave_end)
+                                    
+                                    # 检查是否包含查询日期
+                                    if leave_start.date() <= check_date.date() <= leave_end.date():
+                                        leave_users.add(applicant_open_id)
+                                        print(f"   ✅ {applicant_open_id[:20]}... 请假: {leave_type}")
+                                        break
+                                        
+                    except Exception as e:
+                        continue
+                
+                except Exception as e:
+                    continue
+            
+            if leave_users:
+                print(f"   📊 共 {len(leave_users)} 人在 {date_str} 请假")
+            
+            return leave_users
+            
+        except Exception as e:
+            print(f"   ⚠️ 获取请假人员失败: {e}")
+            import traceback
+            traceback.print_exc()
+            return set()
+    
     def check_user_on_leave(self, user_id: str, date_str: str) -> bool:
         """
         检查用户在指定日期是否请假（通过查询审批系统）
@@ -781,19 +909,25 @@ class BitableAPI:
             on_leave = self._get_on_leave_people(config_path)
             exception_day = self._get_exception_day_people(config_path, date_str)
             
-            # 检查未填写人员中是否有人请假（从日历查询）
+            # 检查未填写人员中是否有人请假（一次性批量查询）
             on_leave_from_calendar = []
             if not_filled_with_id and date_str:
                 print(f"\n🔍 检查未填写人员的请假状态...")
-                for user_info in not_filled_with_id:
-                    user_id = user_info.get('user_id')
-                    name = user_info.get('name')
-                    if user_id and self.check_user_on_leave(user_id, date_str):
-                        on_leave_from_calendar.append(name)
-                        print(f"   📅 {name} 在 {date_str} 请假")
+                
+                # 一次性获取当天所有请假人员的 open_id 集合
+                leave_user_ids = self.get_leave_users_on_date(date_str)
+                
+                if leave_user_ids:
+                    # 批量匹配未填写人员
+                    for user_info in not_filled_with_id:
+                        user_id = user_info.get('user_id')
+                        name = user_info.get('name')
+                        if user_id and user_id in leave_user_ids:
+                            on_leave_from_calendar.append(name)
+                            print(f"   📅 {name} 在 {date_str} 请假")
                 
                 if on_leave_from_calendar:
-                    print(f"✅ 发现 {len(on_leave_from_calendar)} 人请假")
+                    print(f"✅ 共 {len(on_leave_from_calendar)} 人请假，已从提醒名单中移除")
                     # 从未填写列表中移除请假人员
                     not_filled = [name for name in not_filled if name not in on_leave_from_calendar]
                     not_filled_with_id = [u for u in not_filled_with_id if u['name'] not in on_leave_from_calendar]
