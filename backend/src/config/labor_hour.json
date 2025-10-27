@@ -20,7 +20,7 @@
   
   "webhook": {
     "_comment": "飞书群机器人的webhook配置，用于发送检查结果到群组。如果机器人未启用签名校验，secret可以留空或删除",
-    "url": "https://open.feishu.cn/open-apis/bot/v2/hook/e34df2a4-0f9c-422c-b647-cbf53408591e",
+    "url": "https://open.feishu.cn/open-apis/bot/v2/hook/ebe32443-795c-4e92-b28e-29fea8e611be",
     "secret": ""
   },
   

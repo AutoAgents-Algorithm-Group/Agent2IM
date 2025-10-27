@@ -288,6 +288,7 @@ async def handle_approval_callback(request: Request):
         print("=" * 80)
         print(f"📨 收到审批事件回调")
         print(f"   时间: {datetime.now(pytz.timezone('Asia/Shanghai')).strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"   原始数据: {json.dumps(data, ensure_ascii=False)[:500]}")
         
         # 处理URL验证请求（飞书首次配置webhook时会发送）
         if data.get('type') == 'url_verification':
@@ -297,11 +298,23 @@ async def handle_approval_callback(request: Request):
         
         # 处理审批事件
         event_type = data.get('type')
+        print(f"   事件类型: {event_type}")
         
-        if event_type == 'event_callback':
-            # 检查事件ID是否已处理（防止重复处理）
-            event_id = data.get('event_id', '')
+        # 兼容两种事件格式:
+        # 1. type: "event_callback" (标准格式)
+        # 2. type: "approval" (飞书实际发送的格式)
+        if event_type in ['event_callback', 'approval']:
+            # 获取事件ID（尝试多个可能的路径）
+            event_id = (
+                data.get('event_id') or 
+                data.get('uuid') or 
+                data.get('header', {}).get('event_id') or
+                f"approval_{int(datetime.now().timestamp() * 1000)}"
+            )
             
+            print(f"   事件ID: {event_id}")
+            
+            # 检查事件ID是否已处理（防止重复处理）
             if event_manager.is_event_processed(event_id):
                 print(f"⏭️ 事件已处理，跳过: {event_id}")
                 return JSONResponse(content={"code": 0, "msg": "success"})
@@ -322,6 +335,7 @@ async def handle_approval_callback(request: Request):
         
         else:
             print(f"⚠️ 未知的事件类型: {event_type}")
+            print(f"   完整数据: {json.dumps(data, ensure_ascii=False, indent=2)}")
             return JSONResponse(content={"code": 0, "msg": "unknown event type"})
             
     except Exception as e:

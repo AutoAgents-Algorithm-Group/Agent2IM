@@ -132,7 +132,7 @@ class ApprovalSetupChecker:
             app_secret = feishu_config.get('app_secret')
             
             self.client = FeishuClient(app_id=app_id, app_secret=app_secret)
-            token = self.client.get_tenant_access_token()
+            token = self.client.get_access_token()
             
             has_token = bool(token)
             self.print_check(
@@ -164,7 +164,7 @@ class ApprovalSetupChecker:
         
         # 尝试调用审批 API
         try:
-            token = self.client.get_tenant_access_token()
+            token = self.client.get_access_token()
             headers = {
                 "Authorization": f"Bearer {token}",
                 "Content-Type": "application/json"

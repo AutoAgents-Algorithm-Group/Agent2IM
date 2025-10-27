@@ -154,7 +154,7 @@ class ApprovalService:
             审批详情
         """
         try:
-            token = self.client.get_tenant_access_token()
+            token = self.client.get_access_token()
             
             url = f"https://open.feishu.cn/open-apis/approval/v4/instances/{instance_code}"
             
@@ -253,7 +253,7 @@ class ApprovalService:
             创建结果
         """
         try:
-            token = self.client.get_tenant_access_token()
+            token = self.client.get_access_token()
             
             url = "https://open.feishu.cn/open-apis/calendar/v4/timeoff_events"
             

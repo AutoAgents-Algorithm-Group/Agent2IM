@@ -483,7 +483,7 @@ class BitableAPI:
     
     def check_user_on_leave(self, user_id: str, date_str: str) -> bool:
         """
-        检查用户在指定日期是否请假
+        检查用户在指定日期是否请假（通过查询审批系统）
         
         Args:
             user_id: 用户 open_id
@@ -493,44 +493,109 @@ class BitableAPI:
             bool: True 表示请假，False 表示未请假
         """
         try:
-            # 转换日期为时间戳
+            # 转换日期为时间戳（毫秒）
             tz = pytz.timezone('Asia/Shanghai')
-            date = datetime.strptime(date_str, '%Y-%m-%d')
-            date = tz.localize(date)
+            check_date = datetime.strptime(date_str, '%Y-%m-%d')
+            check_date = tz.localize(check_date)
             
-            # 查询时间范围：当天00:00:00 到 23:59:59
-            start_timestamp = int(date.timestamp())
-            end_timestamp = int((date + timedelta(days=1)).timestamp()) - 1
+            # 查询时间范围：前后各7天（单位：秒）
+            start_date = check_date - timedelta(days=7)
+            end_date = check_date + timedelta(days=7)
+            start_timestamp = int(start_date.timestamp())
+            end_timestamp = int(end_date.timestamp())
             
-            # 调用飞书日历 API 查询请假日程
-            token = self.client.get_tenant_access_token()
+            # 调用飞书审批 API 查询用户的审批实例
+            token = self.client.get_access_token()
             
-            url = "https://open.feishu.cn/open-apis/calendar/v4/timeoff_events"
+            url = "https://open.feishu.cn/open-apis/approval/v4/instances"
             
             headers = {
                 "Authorization": f"Bearer {token}",
                 "Content-Type": "application/json"
             }
             
+            # 根据飞书API文档，查询审批实例不需要start_time/end_time参数
+            # 而是通过approval_code筛选，或者直接查询用户的所有审批
             params = {
-                "user_id_type": "open_id",
+                "page_size": 100,
                 "user_id": user_id,
-                "start_time": str(start_timestamp),
-                "end_time": str(end_timestamp)
+                "user_id_type": "open_id"
             }
             
             response = requests.get(url, headers=headers, params=params)
             result = response.json()
             
-            if result.get('code') == 0:
-                events = result.get('data', {}).get('timeoff_events', [])
-                if events:
-                    return True  # 有请假事件
+            # 调试信息
+            # print(f"   📋 请求URL: {url}")
+            # print(f"   📋 请求参数: {params}")
+            # print(f"   📋 响应: {json.dumps(result, ensure_ascii=False)[:500]}")
             
-            return False  # 没有请假事件
+            # 检查API返回的错误
+            if result.get('code') != 0:
+                error_msg = result.get('msg', 'Unknown error')
+                print(f"   ⚠️ 审批API返回错误: code={result.get('code')}, msg={error_msg}")
+                # print(f"   📋 完整响应: {json.dumps(result, ensure_ascii=False, indent=2)}")
+                return False
+            
+            # 检查是否有审批实例
+            instances = result.get('data', {}).get('instance_list', [])
+            if not instances:
+                return False  # 没有审批记录
+            
+            # 遍历审批实例，查找已通过的请假审批
+            for instance in instances:
+                # 只处理已通过的审批
+                if instance.get('status') != 'APPROVED':
+                    continue
+                
+                # 获取审批定义编码（用于判断是否为请假审批）
+                approval_code = instance.get('approval_code', '')
+                approval_name = instance.get('approval_name', '')
+                
+                # 判断是否为请假审批（通常审批名称包含"请假"关键词）
+                if '请假' not in approval_name and 'leave' not in approval_name.lower():
+                    continue
+                
+                # 解析审批表单，获取请假时间范围
+                form = instance.get('form', {})
+                
+                # 尝试从表单中提取开始和结束时间
+                leave_start = None
+                leave_end = None
+                
+                for widget in form:
+                    widget_id = widget.get('id', '')
+                    widget_name = widget.get('name', '')
+                    widget_value = widget.get('value', '')
+                    
+                    # 查找时间相关字段
+                    if '开始' in widget_name or 'start' in widget_name.lower():
+                        try:
+                            # 尝试解析时间戳（毫秒）
+                            if widget_value and widget_value.isdigit():
+                                leave_start = datetime.fromtimestamp(int(widget_value) / 1000, tz=tz)
+                        except:
+                            pass
+                    
+                    if '结束' in widget_name or 'end' in widget_name.lower():
+                        try:
+                            if widget_value and widget_value.isdigit():
+                                leave_end = datetime.fromtimestamp(int(widget_value) / 1000, tz=tz)
+                        except:
+                            pass
+                
+                # 如果成功解析到请假时间范围，检查是否包含查询日期
+                if leave_start and leave_end:
+                    if leave_start.date() <= check_date.date() <= leave_end.date():
+                        print(f"   ✅ 检测到请假: {approval_name} ({leave_start.date()} ~ {leave_end.date()})")
+                        return True
+            
+            return False  # 没有找到匹配的请假记录
             
         except Exception as e:
-            print(f"⚠️ 检查请假状态失败 ({user_id}): {e}")
+            print(f"   ⚠️ 检查请假状态失败 ({user_id}): {e}")
+            import traceback
+            traceback.print_exc()
             return False  # 出错时认为未请假
     
     def check_users_filled(self, user_names: list = None, date_str: str = None, user_field: str = "员工", config_path: str = None, skip_holiday_check: bool = False):
