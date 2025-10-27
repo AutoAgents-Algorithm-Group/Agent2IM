@@ -187,7 +187,7 @@ class LaborHourPublisher:
                 }
             })
         
-        # 添加底部按钮 - 链接到多维表格（更宽）
+        # 添加底部按钮 - 链接到多维表格
         if bitable_url:
             elements.append({"tag": "hr"})
             elements.append({
@@ -200,9 +200,7 @@ class LaborHourPublisher:
                             "tag": "plain_text"
                         },
                         "url": bitable_url,
-                        "type": "primary",
-                        "width": "default",
-                        "size": "medium"
+                        "type": "primary"
                     }
                 ]
             })

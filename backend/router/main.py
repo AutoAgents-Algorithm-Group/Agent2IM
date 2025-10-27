@@ -451,7 +451,7 @@ def create_labor_hour_card(result: dict, date: str, bitable_url: str = None) -> 
             }
         })
     
-    # 添加底部按钮 - 链接到多维表格（更宽）
+    # 添加底部按钮 - 链接到多维表格
     if bitable_url:
         elements.append({"tag": "hr"})
         elements.append({
@@ -464,9 +464,7 @@ def create_labor_hour_card(result: dict, date: str, bitable_url: str = None) -> 
                         "tag": "plain_text"
                     },
                     "url": bitable_url,
-                    "type": "primary",
-                    "width": "default",
-                    "size": "medium"
+                    "type": "primary"
                 }
             ]
         })
