@@ -475,8 +475,7 @@ def create_labor_hour_card(result: dict, date: str, bitable_url: str = None) -> 
                         "tag": "plain_text"
                     },
                     "url": bitable_url,
-                    "type": "primary",
-                    "size": "large"
+                    "type": "primary"
                 }
             ]
         })

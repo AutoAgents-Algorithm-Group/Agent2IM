@@ -211,8 +211,7 @@ class LaborHourPublisher:
                             "tag": "plain_text"
                         },
                         "url": bitable_url,
-                        "type": "primary",
-                        "size": "large"
+                        "type": "primary"
                     }
                 ]
             })
