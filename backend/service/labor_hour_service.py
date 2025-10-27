@@ -271,10 +271,15 @@ class LaborHourPublisher:
             raise e
     
     def publish_check_result(self, result: Dict[str, Any], date: str, bitable_url: str = None) -> Optional[requests.Response]:
-        """发布工时检查结果，如果是节假日则不发送"""
+        """发布工时检查结果，如果是节假日或全部已填写则不发送"""
         # 如果是节假日，不发送消息
         if result.get('is_holiday'):
             print(f"📅 {date} 是节假日，跳过发送消息")
+            return None
+        
+        # 如果所有人都已填写，不发送消息
+        if not result.get('not_filled'):
+            print(f"✅ 所有人都已填写工时，跳过发送消息")
             return None
         
         # 创建并发送卡片
@@ -346,6 +351,20 @@ class LaborHourService:
             print(f"   已填写: {len(result['filled'])} 人")
             print(f"   未填写: {len(result['not_filled'])} 人")
             print(f"   填写率: {result['fill_rate']:.1%}")
+            
+            # 如果所有人都已填写，跳过发送
+            if not result.get('not_filled'):
+                print(f"\n✅ 所有人都已填写工时，跳过发送消息")
+                print(f"\n✅ 工时检查完成")
+                print("=" * 80)
+                
+                return {
+                    "status": "success",
+                    "date": date_str,
+                    "result": result,
+                    "sent": False,
+                    "reason": "all_filled"
+                }
             
             # 3. 发布到飞书群组
             print(f"\n📤 正在发送结果到飞书群组...")
