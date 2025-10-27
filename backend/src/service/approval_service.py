@@ -83,6 +83,16 @@ class ApprovalService:
             # 获取审批定义编码（用于判断是否是请假审批）
             approval_code = event.get('approval_code', '')
             
+            # 请假审批白名单（只处理这些审批类型）
+            LEAVE_APPROVAL_CODES = [
+                'A9D489DC-5F55-4418-99F1-01E1CE734CA1',  # HR小助手 - 请假申请
+            ]
+            
+            # 只处理白名单中的审批类型
+            if approval_code and approval_code not in LEAVE_APPROVAL_CODES:
+                print(f"⏭️ 审批类型 {approval_code} 不在处理范围内，跳过")
+                return {"status": "ignored", "reason": f"approval_code {approval_code} not in whitelist"}
+            
             # 获取审批实例编码
             instance_code = event.get('instance_code', '')
             
