@@ -35,7 +35,7 @@ echo ""
 
 # 启动API服务器
 echo -e "${GREEN}⚙️  启动 Agent2IM API服务器...${NC}"
-cd /app && python backend/src/router/main.py &
+cd /app && python backend/src/api/main.py &
 API_PID=$!
 
 # 等待API启动
