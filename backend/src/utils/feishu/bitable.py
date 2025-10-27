@@ -483,17 +483,29 @@ class BitableAPI:
             print(f"❌ 加载人员配置失败: {e}")
             return []
     
-    def get_leave_users_on_date(self, date_str: str) -> set:
+    def get_leave_users_on_date(self, date_str: str, config_path: str = None) -> tuple[set, dict]:
         """
         获取指定日期所有请假人员的 open_id 集合（一次性查询）
         
         Args:
             date_str: 日期字符串，格式 YYYY-MM-DD
+            config_path: 配置文件路径（用于获取 people.json 中的姓名映射）
         
         Returns:
-            set: 请假人员的 open_id 集合
+            tuple: (请假人员的 open_id 集合, open_id 到姓名的映射字典)
         """
         try:
+            # 从 people.json 加载 open_id 到姓名的映射
+            id_to_name = {}
+            if config_path:
+                try:
+                    people_list = self._load_people_config(config_path)
+                    for person in people_list:
+                        if person.get('open_id'):
+                            id_to_name[person['open_id']] = person['name']
+                except:
+                    pass
+            
             # 转换日期为时间戳（毫秒）
             tz = pytz.timezone('Asia/Shanghai')
             check_date = datetime.strptime(date_str, '%Y-%m-%d')
@@ -507,7 +519,7 @@ class BitableAPI:
             
             # 如果没有配置请假审批编码，返回空集合
             if not self.leave_approval_code:
-                return set()
+                return set(), id_to_name
             
             # 调用飞书审批 API 查询审批实例
             token = self.client.get_access_token()
@@ -533,16 +545,17 @@ class BitableAPI:
             if result.get('code') != 0:
                 error_msg = result.get('msg', 'Unknown error')
                 print(f"   ⚠️ 审批API返回错误: code={result.get('code')}, msg={error_msg}")
-                return set()
+                return set(), {}
             
             # 检查是否有审批实例编码
             instance_codes = result.get('data', {}).get('instance_code_list', [])
             if not instance_codes:
-                return set()
+                return set(), {}
             
             print(f"   📋 找到 {len(instance_codes)} 条审批记录，正在解析...")
             
             leave_users = set()
+            id_to_name = {}  # open_id 到姓名的映射
             
             # 遍历每个审批实例，提取当天请假的人员
             for instance_code in instance_codes:
@@ -598,13 +611,13 @@ class BitableAPI:
                 except Exception as e:
                     continue
             
-            return leave_users
+            return leave_users, id_to_name
             
         except Exception as e:
             print(f"   ⚠️ 获取请假人员失败: {e}")
             import traceback
             traceback.print_exc()
-            return set()
+            return set(), {}
     
     def check_user_on_leave(self, user_id: str, date_str: str) -> bool:
         """
@@ -909,14 +922,16 @@ class BitableAPI:
             if not_filled_with_id and date_str:
                 print(f"\n🔍 检查未填写人员的请假状态...")
                 
-                # 一次性获取当天所有请假人员的 open_id 集合
-                leave_user_ids = self.get_leave_users_on_date(date_str)
+                # 一次性获取当天所有请假人员的 open_id 集合和姓名映射
+                leave_user_ids, leave_id_to_name = self.get_leave_users_on_date(date_str, config_path)
                 
                 if leave_user_ids:
                     print(f"\n   🔍 开始匹配未填写人员...")
                     
-                    # 创建 open_id 到姓名的反向映射（使用已有的 user_id_map）
+                    # 创建 open_id 到姓名的反向映射
+                    # 优先级：people.json 配置 > Bitable 记录
                     id_to_name = {v: k for k, v in user_id_map.items()}
+                    id_to_name.update(leave_id_to_name)  # people.json 的映射优先级更高
                     
                     # 显示请假人员信息（带姓名）
                     leave_info = []

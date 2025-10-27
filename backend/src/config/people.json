@@ -4,97 +4,115 @@
       "id": "001",
       "name": "刘安营",
       "exceptions": [],
-      "off": false
+      "off": false,
+      "open_id": "ou_4c12260bb0c53f040039ca263937440c"
     },
     {
       "id": "002",
       "name": "韩宇轩",
       "exceptions": [],
-      "off": false
+      "off": false,
+      "open_id": "ou_6e924c1061e168a47fa8ec7cd52593be"
     },
     {
       "id": "003",
       "name": "徐俊朗",
       "exceptions": [],
-      "off": false
+      "off": false,
+      "open_id": "ou_815d4f94b0405a30b1439e23e5a9bbd5"
     },
     {
       "id": "004",
       "name": "耿蕾",
       "exceptions": [],
-      "off": false
+      "off": false,
+      "open_id": "ou_036fa498881fe150bb86125c5e1ce2e5"
     },
     {
       "id": "005",
       "name": "石国艳",
       "exceptions": [],
-      "off": false
+      "off": false,
+      "open_id": "ou_a78beca1a90b26162ea089d6fe6b0b88"
     },
     {
       "id": "006",
       "name": "邓健轩",
       "exceptions": [],
-      "off": false
+      "off": false,
+      "open_id": "ou_d7077a8d3493304c15b5829d85802437"
     },
     {
       "id": "007",
       "name": "吴文静",
       "exceptions": [],
-      "off": false
+      "off": false,
+      "open_id": "ou_cd09d8478e614e4a0e67129bbf24941a"
     },
     {
       "id": "008",
       "name": "徐晓东",
       "exceptions": [],
-      "off": false
+      "off": false,
+      "open_id": "ou_2317d13d22e5f8b5c26fd31f8c460da6"
     },
     {
       "id": "009",
       "name": "李佳豪",
       "exceptions": [],
-      "off": false
+      "off": false,
+      "open_id": "ou_98cd959f6943395d1d1fc84aa2a5bce2"
     },
     {
       "id": "010",
       "name": "陈亮",
       "exceptions": [],
-      "off": false
+      "off": false,
+      "open_id": "ou_99b9001ef41d9ac2b19a91feff9965bd"
     },
     {
       "id": "011",
       "name": "孙劲宇",
       "exceptions": [],
-      "off": false
+      "off": false,
+      "open_id": "ou_96e4a20ce120253b08c66cb096fd840a"
     },
     {
       "id": "012",
       "name": "李鹤",
       "exceptions": [],
-      "off": false
+      "off": false,
+      "open_id": "ou_d3758fffed0b8caa2ee17eba355173e3"
     },
     {
       "id": "013",
       "name": "黄克胜",
       "exceptions": [],
-      "off": false
+      "off": false,
+      "open_id": "ou_26c994339a1163c532be6e329fd470db"
     },
     {
       "id": "014",
       "name": "胡东利",
       "exceptions": [],
-      "off": false
+      "off": false,
+      "open_id": "ou_2620381db928d6011c86e2ef77eb31b3"
     },
     {
       "id": "015",
       "name": "滕凯",
-      "exceptions": ["星期二"],
-      "off": false
+      "exceptions": [
+        "星期二"
+      ],
+      "off": false,
+      "open_id": "ou_e2d187199d7b99592e77b52f6ddfa0a0"
     },
     {
       "id": "016",
       "name": "莫铭浩",
       "exceptions": [],
-      "off": false
+      "off": false,
+      "open_id": "ou_fffc6b622258eaf0172be294ab99d27a"
     }
   ],
   "settings": {
