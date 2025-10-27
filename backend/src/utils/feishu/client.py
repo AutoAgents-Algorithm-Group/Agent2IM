@@ -61,11 +61,11 @@ class FeishuClient:
                 self._access_token_cache["token"] = token
                 self._access_token_cache["expires_at"] = current_time + expires_in - 600
                 
-                self.log.success(f"✅ 获取访问令牌成功")
+                self.log.success(f"获取访问令牌成功")
                 return token
             else:
                 raise Exception(f"获取访问令牌失败: {result}")
         except Exception as e:
-            self.log.error(f"❌ 获取飞书访问令牌失败: {e}")
+            self.log.error(f"获取飞书访问令牌失败: {e}")
             raise e
 

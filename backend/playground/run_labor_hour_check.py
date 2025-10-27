@@ -10,15 +10,15 @@ from src.models import Stage
 
 if __name__ == '__main__':
     log = set_stage(Stage.TASK_EXEC)
-    log.info("🚀 手动执行工时检查...")
+    log.info("手动执行工时检查...")
     
     try:
         result = run_labor_hour_check_from_config()
         if result and result.get('status') == 'success':
-            log.success(f"✅ 工时检查完成")
+            log.success(f"工时检查完成")
         else:
-            log.warning("⚠️ 工时检查可能失败，请检查日志文件")
+            log.warning("工时检查可能失败，请检查日志文件")
     except Exception as e:
-        log.exception(f"❌ 执行失败: {e}")
+        log.exception(f"执行失败: {e}")
 
 # 执行方式: python run_labor_hour_check.py
