@@ -302,12 +302,12 @@ async def handle_approval_callback(request: Request):
             # 检查事件ID是否已处理（防止重复处理）
             event_id = data.get('event_id', '')
             
-            if event_manager.is_processed(event_id):
+            if event_manager.is_event_processed(event_id):
                 print(f"⏭️ 事件已处理，跳过: {event_id}")
                 return JSONResponse(content={"code": 0, "msg": "success"})
             
             # 标记事件为已处理
-            event_manager.mark_processed(event_id)
+            event_manager.mark_event_processed(event_id)
             
             # 创建审批服务实例
             approval_service = create_approval_service_from_config()

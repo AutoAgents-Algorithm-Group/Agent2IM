@@ -8,4 +8,4 @@ dev:
 	@echo ""
 	@echo "按 Ctrl+C 停止服务"
 	@echo ""
-	cd backend/src/api && uvicorn main:app --host 0.0.0.0 --port 9000 --reload
+	cd backend && uvicorn src.api.main:app --host 0.0.0.0 --port 9000 --reload
