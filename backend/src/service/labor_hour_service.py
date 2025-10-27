@@ -250,10 +250,6 @@ class LaborHourPublisher:
         elements.append({
             "tag": "img",
             "img_key": hero_image_url,
-            "alt": {
-                "tag": "plain_text",
-                "content": "「本周精选」新鲜出炉，等你来品鉴！"
-            },
             "mode": "fit_horizontal",
             "preview": True
         })
