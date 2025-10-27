@@ -245,25 +245,21 @@ class LaborHourPublisher:
         # 构建卡片元素
         elements = []
         
-        # TODO: 添加头图
-        # 飞书卡片图片需要使用 img_key（飞书内部的图片key），不能直接使用外部 URL
-        # 解决方案：
-        # 1. 先上传图片到飞书获取 img_key
-        # 2. 或者暂时不使用图片，等飞书支持外部 URL
+        # 添加头图
+        # 注意：需要将 hero.jpg 上传到图床，或使用飞书图片 URL
+        # 临时使用文本替代，等待配置图片 URL
+        hero_image_url = "img_v3_02rf_b1d9fb68-67f7-45f4-842e-be02fefd55dg"  # 请替换为实际的图片 URL
         
-        # 暂时注释掉图片，避免报错 11310
-        # hero_img_key = "img_v3_xxxx_xxxx"  # 需要先上传图片获取
-        # if hero_img_key:
-        #     elements.append({
-        #         "tag": "img",
-        #         "img_key": hero_img_key,
-        #         "alt": {
-        #             "tag": "plain_text",
-        #             "content": "「本周精选」新鲜出炉，等你来品鉴！"
-        #         },
-        #         "mode": "fit_horizontal",
-        #         "preview": True
-        #     })
+        elements.append({
+            "tag": "img",
+            "img_key": hero_image_url,
+            "alt": {
+                "tag": "plain_text",
+                "content": "「本周精选」新鲜出炉，等你来品鉴！"
+            },
+            "mode": "fit_horizontal",
+            "preview": True
+        })
         
         # 统计信息和提示文案合并
         total = len(result['filled']) + len(result['not_filled'])

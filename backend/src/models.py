@@ -12,12 +12,12 @@ class Stage(str, Enum):
     用于标识不同的业务阶段和操作类型
     """
     # 系统级别
-    SYSTEM = "系统"
-    INIT = "初始化"
+    SYSTEM = "系统操作"
+    INIT = "系统初始"
     CONFIG = "配置加载"
     
     # 飞书相关
-    FEISHU_API = "飞书API"
+    FEISHU_API = "飞书接口"
     FEISHU_AUTH = "飞书认证"
     BITABLE = "多维表格"
     CARD_CREATE = "卡片生成"
@@ -41,7 +41,7 @@ class Stage(str, Enum):
     NEWS_PROCESS = "新闻处理"
     
     # Webhook
-    WEBHOOK = "Webhook"
+    WEBHOOK = "网络钩子"
     EVENT_CALLBACK = "事件回调"
     
     # 错误处理

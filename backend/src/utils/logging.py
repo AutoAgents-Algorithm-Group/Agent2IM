@@ -28,8 +28,8 @@ class Logger:
         self.log_dir = self.project_root / "logs"
         self.log_dir.mkdir(exist_ok=True)
         
-        # 配置默认的 extra 值
-        _logger.configure(extra={"stage": Stage.SYSTEM})
+        # 配置默认的 extra 值（使用枚举的值而不是枚举本身）
+        _logger.configure(extra={"stage": Stage.SYSTEM.value})
         
         # 配置日志格式
         self._setup_handlers()
@@ -128,7 +128,8 @@ class Logger:
             >>> log.info("开始检查工时")
             # 输出: 17:30:00 | INFO    | 工时检查   | 开始检查工时
         """
-        return self.logger.bind(stage=stage)
+        # 传递枚举的值（中文字符串）而不是枚举对象本身
+        return self.logger.bind(stage=stage.value)
 
 
 # 创建全局日志管理器实例
