@@ -239,7 +239,7 @@ class LaborHourPublisher:
         # 添加头图
         # 注意：需要将 hero.jpg 上传到图床，或使用飞书图片 URL
         # 临时使用文本替代，等待配置图片 URL
-        hero_image_url = "img_v3_02rf_5400b8c7-2b04-48d5-a995-7ee4f343b28g"  # 请替换为实际的图片 URL
+        hero_image_url = "img_v3_02rf_b04562b9-99ec-4585-b30f-c4f28d9f609g"  # 请替换为实际的图片 URL
         
         elements.append({
             "tag": "img",

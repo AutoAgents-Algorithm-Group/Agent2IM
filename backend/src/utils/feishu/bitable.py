@@ -131,7 +131,8 @@ class BitableAPI:
             
             return result
         except Exception as e:
-            self.log.error(f"解析URL失败: {e}")
+            # 静态方法无法使用 self.log
+            print(f"解析URL失败: {e}")
             return result
     
     def get_all_records(self, view_id: str = None, convert_timestamp: bool = True):
@@ -424,7 +425,8 @@ class BitableAPI:
                 
                 if is_holiday:
                     holiday_name = holiday_info.get('name', '周末')
-                    self.log.info(f"{date_str} 是{holiday_name}，无需检查")
+                    # 静态方法无法使用 self.log
+                    print(f"{date_str} 是{holiday_name}，无需检查")
                 
                 return is_holiday
             else:
@@ -432,7 +434,8 @@ class BitableAPI:
                 date_obj = datetime.strptime(date_str, '%Y-%m-%d')
                 is_weekend = date_obj.weekday() >= 5  # 5=周六, 6=周日
                 if is_weekend:
-                    self.log.info(f"{date_str} 是周末，无需检查")
+                    # 静态方法无法使用 self.log
+                    print(f"{date_str} 是周末，无需检查")
                 return is_weekend
                 
         except Exception as e:
@@ -440,7 +443,8 @@ class BitableAPI:
             date_obj = datetime.strptime(date_str, '%Y-%m-%d')
             is_weekend = date_obj.weekday() >= 5
             if is_weekend:
-                self.log.info(f"{date_str} 是周末，无需检查")
+                # 静态方法无法使用 self.log
+                print(f"{date_str} 是周末，无需检查")
             return is_weekend
     
     @staticmethod
@@ -478,14 +482,16 @@ class BitableAPI:
                 # 检查例外日期
                 exceptions = person.get('exceptions', [])
                 if weekday and weekday in exceptions:
-                    self.log.debug(f"  ℹ️ {person['name']} 在{weekday}无需填写（例外日期）")
+                    # 静态方法无法使用 self.log
+                    # print(f"{person['name']} 在{weekday}无需填写（例外日期）")
                     continue
                 
                 active_people.append(person['name'])
             
             return active_people
         except Exception as e:
-            self.log.error(f"加载人员配置失败: {e}")
+            # 静态方法无法使用 self.log
+            print(f"加载人员配置失败: {e}")
             return []
     
     def get_leave_users_on_date(self, date_str: str, config_path: str = None) -> tuple[set, dict]:
