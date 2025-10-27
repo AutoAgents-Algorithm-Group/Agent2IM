@@ -16,11 +16,10 @@ from autoagentsai.client import ChatClient
 
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utils.news.config_manager import ConfigManager
-from utils.news.database import NewsDatabase
-from utils.scrapers import (
+from src.utils.news.config_manager import ConfigManager
+from src.utils.news.database import NewsDatabase
+from src.utils.scrapers import (
     TechCrunchScraper,
     VergeScraper,
     GitHubTrendingScraper,

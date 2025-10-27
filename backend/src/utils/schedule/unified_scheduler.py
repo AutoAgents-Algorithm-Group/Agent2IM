@@ -13,10 +13,9 @@ import pytz
 
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from service.news_service import run_news_and_publish
-from service.labor_hour_service import run_labor_hour_check_from_config, LaborHourService
+from src.service.news_service import run_news_and_publish
+from src.service.labor_hour_service import run_labor_hour_check_from_config, LaborHourService
 import json as json_lib
 
 
@@ -32,6 +31,7 @@ class UnifiedScheduler:
         """
         # 配置文件目录
         if config_dir is None:
+            # 从 src/utils/schedule/ 回到 src/config/
             current_dir = Path(__file__).parent.parent.parent
             config_dir = current_dir / "config"
         else:

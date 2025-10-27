@@ -13,7 +13,7 @@ import time
 backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, backend_dir)
 
-from utils.schedule.unified_scheduler import UnifiedScheduler
+from src.utils.schedule.unified_scheduler import UnifiedScheduler
 
 
 def main():

@@ -14,8 +14,8 @@ from datetime import datetime, timedelta
 backend_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_dir))
 
-from utils.feishu.client import FeishuClient
-from utils.feishu.bitable import BitableAPI
+from src.utils.feishu.client import FeishuClient
+from src.utils.feishu.bitable import BitableAPI
 
 
 def test_single_date_check():

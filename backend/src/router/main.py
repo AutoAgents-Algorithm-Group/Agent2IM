@@ -12,14 +12,14 @@ current_dir = PathLib(__file__).parent
 src_dir = current_dir.parent
 sys.path.insert(0, str(src_dir))
 
-from utils.feishu import FeishuService
-from utils.feishu.client import FeishuClient
-from utils.feishu.bitable import BitableAPI
-from utils.feishu.message import MessageAPI
-from utils.feishu.card import CardBuilder
-from utils.schedule import ReminderScheduler
-from utils.schedule.unified_scheduler import UnifiedScheduler
-from utils import event_manager
+from src.utils.feishu import FeishuService
+from src.utils.feishu.client import FeishuClient
+from src.utils.feishu.bitable import BitableAPI
+from src.utils.feishu.message import MessageAPI
+from src.utils.feishu.card import CardBuilder
+from src.utils.schedule import ReminderScheduler
+from src.utils.schedule.unified_scheduler import UnifiedScheduler
+from src.utils import event_manager
 from datetime import datetime
 import pytz
 import os
@@ -41,7 +41,7 @@ async def startup_event():
     global reminder_scheduler, unified_scheduler
     
     # 获取配置文件目录
-    config_dir = PathLib(__file__).parent.parent / "config"
+    config_dir = PathLib(__file__).parent / "config"
     
     # 检查是否启用统一调度器（通过环境变量控制）
     use_unified_scheduler = os.environ.get('USE_UNIFIED_SCHEDULER', 'false').lower() == 'true'
@@ -451,7 +451,7 @@ def create_labor_hour_card(result: dict, date: str, bitable_url: str = None) -> 
             }
         })
     
-    # 添加底部按钮 - 链接到多维表格
+    # 添加底部按钮 - 链接到多维表格（更宽）
     if bitable_url:
         elements.append({"tag": "hr"})
         elements.append({
@@ -464,7 +464,9 @@ def create_labor_hour_card(result: dict, date: str, bitable_url: str = None) -> 
                         "tag": "plain_text"
                     },
                     "url": bitable_url,
-                    "type": "primary"
+                    "type": "primary",
+                    "width": "default",
+                    "size": "medium"
                 }
             ]
         })

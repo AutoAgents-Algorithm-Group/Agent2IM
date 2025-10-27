@@ -62,14 +62,14 @@ check_config_file() {
 CONFIG_OK=true
 
 # 检查必需的配置文件
-check_config_file "backend/config/scheduled_tasks.json" "true" || CONFIG_OK=false
-check_config_file "backend/config/labor_hour.json" "true" || CONFIG_OK=false
+check_config_file "backend/src/config/scheduled_tasks.json" "true" || CONFIG_OK=false
+check_config_file "backend/src/config/labor_hour.json" "true" || CONFIG_OK=false
 
 # 检查可选的配置文件
-check_config_file "backend/config/news.json" "false"
-check_config_file "backend/config/people.json" "false"
-check_config_file "backend/config/task.json" "false"
-check_config_file "backend/config/message.json" "false"
+check_config_file "backend/src/config/news.json" "false"
+check_config_file "backend/src/config/people.json" "false"
+check_config_file "backend/src/config/task.json" "false"
+check_config_file "backend/src/config/message.json" "false"
 
 echo ""
 
@@ -77,8 +77,8 @@ if [ "$CONFIG_OK" = false ]; then
     echo -e "${RED}❌ 配置文件检查失败，请先配置必需的文件${NC}"
     echo ""
     echo -e "${YELLOW}💡 提示:${NC}"
-    echo "   1. 配置 backend/config/labor_hour.json"
-    echo "   2. 配置 backend/config/scheduled_tasks.json"
+    echo "   1. 配置 backend/src/config/labor_hour.json"
+    echo "   2. 配置 backend/src/config/scheduled_tasks.json"
     echo "   3. 查看文档: docker/README_SCHEDULER.md"
     exit 1
 fi
@@ -87,7 +87,7 @@ fi
 echo -e "${BLUE}📅 定时任务配置:${NC}"
 python3 -c "
 import json
-with open('backend/config/scheduled_tasks.json') as f:
+with open('backend/src/config/scheduled_tasks.json') as f:
     config = json.load(f)
     print(f'   时区: {config[\"timezone\"]}')
     print('   任务:')

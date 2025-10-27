@@ -13,10 +13,12 @@ class ConfigManager:
             config_path: 配置文件路径，默认为backend目录下的 config.yml
         """
         if config_path is None:
-            # 获取backend/config目录下的 news.yml
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            backend_dir = os.path.dirname(os.path.dirname(current_dir))  # 往上两级到backend
-            self.config_path = os.path.join(backend_dir, 'config', 'news.yml')
+            # 获取backend/src/config目录下的 news.yml
+            # 从 src/utils/news/ 回到 src/config/
+            current_dir = os.path.dirname(os.path.abspath(__file__))  # src/utils/news/
+            utils_dir = os.path.dirname(current_dir)  # src/utils/
+            src_dir = os.path.dirname(utils_dir)  # src/
+            self.config_path = os.path.join(src_dir, 'config', 'news.yml')
         else:
             self.config_path = config_path
         

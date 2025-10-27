@@ -12,7 +12,7 @@ import os
 backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, backend_dir)
 
-from service.labor_hour_service import run_labor_hour_check_from_config
+from src.service.labor_hour_service import run_labor_hour_check_from_config
 
 if __name__ == '__main__':
     print("🚀 手动执行工时检查...")

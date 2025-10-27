@@ -11,7 +11,7 @@ from pathlib import Path
 current_dir = Path(__file__).parent
 sys.path.insert(0, str(current_dir))
 
-from utils.schedule import ReminderScheduler
+from src.utils.schedule import ReminderScheduler
 
 
 def test_task_execution():

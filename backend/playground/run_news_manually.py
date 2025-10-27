@@ -12,7 +12,7 @@ import os
 backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, backend_dir)
 
-from service.news_service import run_news_and_publish
+from src.service.news_service import run_news_and_publish
 
 if __name__ == '__main__':
     print("🚀 手动执行AI新闻发送...")

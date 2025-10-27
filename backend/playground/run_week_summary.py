@@ -13,7 +13,7 @@ import os
 # 添加项目根目录到 Python 路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from service.labor_hour_service import LaborHourService
+from src.service.labor_hour_service import LaborHourService
 import json
 
 
@@ -23,6 +23,7 @@ def run_week_summary(end_date_str: str = None):
         # 读取配置文件
         config_path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            'src',
             'config',
             'labor_hour.json'
         )
@@ -53,7 +54,7 @@ def run_week_summary(end_date_str: str = None):
         
     except FileNotFoundError:
         print(f"❌ 配置文件不存在: {config_path}")
-        print("💡 请创建配置文件 backend/config/labor_hour.json")
+        print("💡 请创建配置文件 backend/src/config/labor_hour.json")
         return None
     except Exception as e:
         print(f"❌ 执行失败: {e}")
@@ -71,5 +72,5 @@ if __name__ == '__main__':
     else:
         print(f"📅 运行本周的周总结")
     
-    run_week_summary(end_date)
+    run_week_summary("2025-10-24")
 

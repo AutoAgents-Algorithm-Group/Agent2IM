@@ -22,6 +22,7 @@ class ReminderScheduler:
         """
         # 配置文件目录
         if config_dir is None:
+            # 从 src/utils/schedule/ 回到 src/config/
             current_dir = Path(__file__).parent.parent.parent
             config_dir = current_dir / "config"
         else:

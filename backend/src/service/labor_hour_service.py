@@ -18,11 +18,10 @@ from collections import defaultdict
 
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utils.feishu.client import FeishuClient
-from utils.feishu.bitable import BitableAPI
-from utils.feishu.card import CardBuilder
+from src.utils.feishu.client import FeishuClient
+from src.utils.feishu.bitable import BitableAPI
+from src.utils.feishu.card import CardBuilder
 
 
 class LaborHourChecker:
@@ -744,10 +743,11 @@ def run_labor_hour_check_from_config(date_str: str = None):
     Args:
         date_str: 检查日期，格式 YYYY-MM-DD，默认为今天
     
-    配置文件路径: backend/config/labor_hour.json
+    配置文件路径: backend/src/config/labor_hour.json
     """
     try:
         # 读取配置文件
+        # 从 src/service/ 回到 src/config/
         config_path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
             'config',
@@ -780,7 +780,7 @@ def run_labor_hour_check_from_config(date_str: str = None):
         
     except FileNotFoundError:
         print(f"❌ 配置文件不存在: {config_path}")
-        print("💡 请创建配置文件 backend/config/labor_hour.json")
+        print("💡 请创建配置文件 backend/src/config/labor_hour.json")
         return None
     except Exception as e:
         print(f"❌ 执行失败: {e}")

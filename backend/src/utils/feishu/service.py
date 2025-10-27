@@ -392,7 +392,7 @@ class FeishuService:
     def create_dynamic_services(agent_id: str, auth_key: str, auth_secret: str, app_id: str, app_secret: str):
         """动态创建服务实例"""
         try:
-            from service.autoagents_service import AutoAgentsService
+            from src.service.autoagents_service import AutoAgentsService
             
             # 创建动态AI服务
             dynamic_ai_service = AutoAgentsService(
