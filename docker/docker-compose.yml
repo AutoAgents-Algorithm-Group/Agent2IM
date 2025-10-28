@@ -27,8 +27,9 @@ services:
       - TZ=Asia/Shanghai
     volumes:
       # 挂载配置文件（必需）
-      - ../backend/src/config/labor_hour.json:/app/backend/src/config/labor_hour.json:ro
-      - ../backend/src/config/people.json:/app/backend/src/config/people.json:ro
+      - ../backend/src/config/labor_hour.yaml:/app/backend/src/config/labor_hour.yaml:ro
+      - ../backend/src/config/approval.yaml:/app/backend/src/config/approval.yaml:ro
+      - ../backend/src/config/news.yaml:/app/backend/src/config/news.yaml:ro
       # 挂载日志目录（可选）
       - ./logs:/app/logs
     restart: unless-stopped
@@ -61,12 +62,9 @@ services:
       - TZ=Asia/Shanghai
     volumes:
       # 挂载配置文件（必需）
-      - ../backend/src/config/scheduled_tasks.json:/app/backend/src/config/scheduled_tasks.json:ro
-      - ../backend/src/config/labor_hour.json:/app/backend/src/config/labor_hour.json:ro
-      - ../backend/src/config/news.yml:/app/backend/src/config/news.yml:ro
-      - ../backend/src/config/people.json:/app/backend/src/config/people.json:ro
-      - ../backend/src/config/task.json:/app/backend/src/config/task.json:ro
-      - ../backend/src/config/message.json:/app/backend/src/config/message.json:ro
+      - ../backend/src/config/labor_hour.yaml:/app/backend/src/config/labor_hour.yaml:ro
+      - ../backend/src/config/approval.yaml:/app/backend/src/config/approval.yaml:ro
+      - ../backend/src/config/news.yaml:/app/backend/src/config/news.yaml:ro
       # 挂载日志目录（可选）
       - ./logs:/app/logs
     restart: unless-stopped

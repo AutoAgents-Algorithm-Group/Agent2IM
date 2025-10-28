@@ -69,8 +69,9 @@ main() {
     
     # 检查配置文件
     CONFIG_FILES=(
-        "/app/backend/src/config/scheduled_tasks.json"
-        "/app/backend/src/config/labor_hour.json"
+        "/app/backend/src/config/labor_hour.yaml"
+        "/app/backend/src/config/approval.yaml"
+        "/app/backend/src/config/news.yaml"
     )
     
     log_info "检查配置文件..."
