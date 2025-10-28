@@ -51,7 +51,7 @@ class ReminderTasks:
             current_time = now.strftime("%Y-%m-%d %H:%M:%S")
             current_date = now.strftime("%Y-%m-%d")
             
-            # 如果是早上10点的提醒，日期应该是昨天
+            # 如果是早上10点的补填提醒，日期应该是昨天
             if template_id == "morning_makeup":
                 yesterday = now - datetime.timedelta(days=1)
                 current_date = yesterday.strftime("%Y-%m-%d")
@@ -125,18 +125,19 @@ class ReminderTasks:
             print(f"❌ 判断提醒日期失败: {e}")
             return True
     
-    def get_unfilled_users(self, check_date: str = "today") -> List[Dict]:
-        """获取未填写表格的用户列表"""
+    def get_unfilled_users(self, check_date: int = 0) -> List[Dict]:
+        """
+        获取未填写表格的用户列表
+        
+        Args:
+            check_date: 日期偏移量，-1=昨天，0=今天，1=明天
+        """
         try:
             active_people = self.get_active_people()
             
             tz = pytz.timezone(self.timezone)
             now = datetime.datetime.now(tz)
-            
-            if check_date == "yesterday":
-                check_datetime = now - datetime.timedelta(days=1)
-            else:
-                check_datetime = now
+            check_datetime = now + datetime.timedelta(days=check_date)
             
             date_str = check_datetime.strftime("%Y-%m-%d")
             
@@ -176,7 +177,7 @@ class ReminderTasks:
         try:
             print(f"\n⏰ 执行任务: 晚上9点群聊提醒")
             
-            unfilled_users = self.get_unfilled_users(check_date="today")
+            unfilled_users = self.get_unfilled_users(check_date=0)
             
             if not unfilled_users:
                 print("✅ 所有用户都已填写表格，无需提醒")
@@ -206,7 +207,7 @@ class ReminderTasks:
         try:
             print(f"\n⏰ 执行任务: 晚上11点私信提醒")
             
-            unfilled_users = self.get_unfilled_users(check_date="today")
+            unfilled_users = self.get_unfilled_users(check_date=0)
             
             if not unfilled_users:
                 print("✅ 所有用户都已填写表格，无需提醒")
@@ -232,7 +233,7 @@ class ReminderTasks:
         try:
             print(f"\n⏰ 执行任务: 早上10点群聊补填提醒")
             
-            unfilled_users = self.get_unfilled_users(check_date="yesterday")
+            unfilled_users = self.get_unfilled_users(check_date=-1)
             
             if not unfilled_users:
                 print("✅ 所有用户都已填写表格，无需提醒")

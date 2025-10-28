@@ -10,6 +10,7 @@ from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 from typing import Optional, List, Dict, Any
 import pytz
+import chinese_calendar as calendar
 from src.utils.logging import set_stage
 from src.models import Stage
 
@@ -399,100 +400,62 @@ class BitableAPI:
     @staticmethod
     def is_holiday(date_str: str) -> bool:
         """
-        判断是否为节假日（包括周末和法定节假日）
+        判断是否为节假日（非工作日）
+        使用 chinesecalendar 库，支持中国法定节假日和调休
         
         Args:
             date_str: 日期字符串，格式 YYYY-MM-DD
             
         Returns:
-            bool: 是否为节假日
+            bool: 是否为节假日（非工作日）
+        
+        说明:
+            - 法定节假日（元旦、春节、清明、劳动节、端午、中秋、国庆）→ True
+            - 普通周末 → True
+            - 调休工作日（如国庆前的周六上班）→ False
         """
         try:
-            # 方式1: 使用免费的中国节假日API
-            url = f"https://timor.tech/api/holiday/info/{date_str}"
-            response = requests.get(url, timeout=5)
+            date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
             
-            # 检查HTTP状态码
-            if response.status_code != 200:
-                raise Exception(f"API返回状态码 {response.status_code}")
+            # 使用 is_workday() 的反向逻辑
+            # is_workday() 会正确处理调休：
+            # - 正常工作日 → True
+            # - 调休的周末（要上班）→ True
+            # - 法定节假日 → False
+            # - 普通周末 → False
+            is_work = calendar.is_workday(date_obj)
+            is_hol = not is_work
             
-            result = response.json()
-            
-            if result.get('code') == 0:
-                holiday_info = result.get('type', {})
-                # type.type: 0-工作日 1-周末 2-节假日 3-调休
-                is_holiday = holiday_info.get('type', 0) in [1, 2]
-                
-                if is_holiday:
-                    holiday_name = holiday_info.get('name', '周末')
-                    # 静态方法无法使用 self.log
+            if is_hol:
+                # 获取节假日详情
+                detail = calendar.get_holiday_detail(date_obj)
+                if detail and detail[0]:  # (True, 'Holiday Name')
+                    holiday_name = detail[1] if detail[1] else '休息日'
+                    # 转换英文节假日名称为中文
+                    name_map = {
+                        'New Year\'s Day': '元旦',
+                        'Spring Festival': '春节',
+                        'Tomb-sweeping Day': '清明节',
+                        'Labour Day': '劳动节',
+                        'Dragon Boat Festival': '端午节',
+                        'Mid-autumn Festival': '中秋节',
+                        'National Day': '国庆节'
+                    }
+                    holiday_name = name_map.get(holiday_name, holiday_name)
                     print(f"{date_str} 是{holiday_name}，无需检查")
-                
-                return is_holiday
-            else:
-                # API返回错误代码，fallback到本地判断
-                date_obj = datetime.strptime(date_str, '%Y-%m-%d')
-                is_weekend = date_obj.weekday() >= 5  # 5=周六, 6=周日
-                if is_weekend:
-                    # 静态方法无法使用 self.log
-                    print(f"{date_str} 是周末，无需检查")
-                return is_weekend
+                else:
+                    print(f"{date_str} 是休息日，无需检查")
+            
+            return is_hol
                 
         except Exception as e:
-            # 静默处理API错误，使用本地判断
+            # 异常情况，fallback 到周末判断
+            print(f"判断节假日时出错: {e}，使用周末判断")
             date_obj = datetime.strptime(date_str, '%Y-%m-%d')
             is_weekend = date_obj.weekday() >= 5
             if is_weekend:
-                # 静态方法无法使用 self.log
                 print(f"{date_str} 是周末，无需检查")
             return is_weekend
-    
-    @staticmethod
-    def load_people_from_config(config_path: str = None, date_str: str = None):
-        """
-        从配置文件加载人员名单（排除请假人员和例外日期人员）
-        
-        Args:
-            config_path: 配置文件路径，默认为 backend/config/people.json
-            date_str: 日期字符串，用于判断例外日期
-            
-        Returns:
-            list: 应该检查的人员姓名列表
-        """
-        if not config_path:
-            # 默认配置文件路径
-            # bitable.py 在 backend/utils/feishu/ 下，需要往上3层到达 backend/
-            backend_dir = Path(__file__).parent.parent.parent
-            config_path = backend_dir / "config" / "people.json"
-        
-        try:
-            with open(config_path, 'r', encoding='utf-8') as f:
-                config = json.load(f)
-            
-            # 获取当天是星期几
-            weekday = BitableAPI.get_weekday_name(date_str) if date_str else None
-            
-            # 过滤人员：排除请假的和例外日期的
-            active_people = []
-            for person in config.get('people', []):
-                # 跳过请假的人
-                if person.get('off', False):
-                    continue
-                
-                # 检查例外日期
-                exceptions = person.get('exceptions', [])
-                if weekday and weekday in exceptions:
-                    # 静态方法无法使用 self.log
-                    # print(f"{person['name']} 在{weekday}无需填写（例外日期）")
-                    continue
-                
-                active_people.append(person['name'])
-            
-            return active_people
-        except Exception as e:
-            # 静态方法无法使用 self.log
-            print(f"加载人员配置失败: {e}")
-            return []
     
     def get_leave_users_on_date(self, date_str: str, config_path: str = None) -> tuple[set, dict]:
         """
@@ -500,22 +463,14 @@ class BitableAPI:
         
         Args:
             date_str: 日期字符串，格式 YYYY-MM-DD
-            config_path: 配置文件路径（用于获取 people.json 中的姓名映射）
+            config_path: （已弃用，保留用于向后兼容）
         
         Returns:
             tuple: (请假人员的 open_id 集合, open_id 到姓名的映射字典)
         """
         try:
-            # 从 people.json 加载 open_id 到姓名的映射
+            # 初始化映射字典
             id_to_name = {}
-            if config_path:
-                try:
-                    people_list = self._load_people_config(config_path)
-                    for person in people_list:
-                        if person.get('open_id'):
-                            id_to_name[person['open_id']] = person['name']
-                except:
-                    pass
             
             # 转换日期为时间戳（毫秒）
             tz = pytz.timezone('Asia/Shanghai')
@@ -769,16 +724,19 @@ class BitableAPI:
             import traceback
             return False  # 出错时认为未请假
     
-    def check_users_filled(self, user_names: list = None, date_str: str = None, user_field: str = "员工", config_path: str = None, skip_holiday_check: bool = False):
+    def check_users_filled(self, user_names: list = None, date_str: str = None, user_field: str = "员工", 
+                          exceptions: dict = None, skip_holiday_check: bool = False, 
+                          external_user_id_map: dict = None):
         """
         检查指定人员名单是否都填写了某日期的记录
         
         Args:
-            user_names: 人员姓名列表，如 ["张三", "李四"]。如果不提供，则从配置文件读取（排除请假人员和例外日期）
+            user_names: 人员姓名列表，如 ["张三", "李四"]。必须提供，不再从配置文件读取
             date_str: 日期字符串，格式 YYYY-MM-DD
             user_field: 用户字段名，默认"员工"
-            config_path: 配置文件路径，默认为 backend/config/people.json
+            exceptions: 例外日期配置，格式: {"姓名": ["星期一", "星期二"]}
             skip_holiday_check: 是否跳过节假日检查，默认False
+            external_user_id_map: 外部提供的姓名到open_id的映射，用于@功能和请假检测
             
         Returns:
             dict: 包含已填写、未填写人员信息的字典
@@ -793,13 +751,12 @@ class BitableAPI:
             }
             
         示例:
-            # 方式1: 从配置文件自动读取（推荐）
-            result = bitable.check_users_filled(date_str="2025-09-30")
-            
-            # 方式2: 手动指定人员名单
+            # 手动指定人员名单和例外日期
             result = bitable.check_users_filled(
-                user_names=["石国艳", "徐晓东", "胡东利"], 
-                date_str="2025-09-30"
+                user_names=["石国艳", "徐晓东", "胡东利", "滕凯"], 
+                date_str="2025-09-30",
+                exceptions={"滕凯": ["星期二"]},
+                external_user_id_map={"石国艳": "ou_xxx", "徐晓东": "ou_yyy", ...}
             )
         """
         # 检查是否为节假日
@@ -818,25 +775,47 @@ class BitableAPI:
                     'message': f'{date_str} 是节假日，无需检查'
                 }
         
-        # 如果没有提供人员名单，从配置文件读取
-        if user_names is None:
-            self.log.info("从配置文件读取人员名单...")
-            self.log.info(f"{date_str} 是{self.get_weekday_name(date_str)}")
-            user_names = self.load_people_from_config(config_path, date_str)
-            
-            if not user_names:
-                self.log.warning("未找到有效的人员名单（所有人都请假或在例外日期）")
-                return {
-                    'all_filled': True,
-                    'filled': [],
-                    'not_filled': [],
-                    'on_leave': self._get_on_leave_people(config_path),
-                    'exception_day': self._get_exception_day_people(config_path, date_str),
-                    'is_holiday': False,
-                    'fill_rate': 1.0
-                }
-            
-            self.log.success(f"需要检查 {len(user_names)} 名人员")
+        # 必须提供人员名单
+        if not user_names:
+            self.log.error("必须提供 user_names 参数")
+            return {
+                'all_filled': False,
+                'filled': [],
+                'not_filled': [],
+                'on_leave': [],
+                'exception_day': [],
+                'is_holiday': False,
+                'fill_rate': 0.0,
+                'message': '缺少 user_names 参数'
+            }
+        
+        # 处理例外日期
+        exceptions = exceptions or {}
+        exception_day_users = []
+        if exceptions and date_str:
+            weekday = self.get_weekday_name(date_str)
+            for name, exception_days in exceptions.items():
+                if weekday in exception_days and name in user_names:
+                    exception_day_users.append(name)
+                    self.log.debug(f"   {name} 在{weekday}无需填写（例外日期）")
+        
+        # 从检查名单中移除例外日期人员
+        user_names = [name for name in user_names if name not in exception_day_users]
+        
+        if not user_names:
+            self.log.warning("所有人都在例外日期，无需检查")
+            return {
+                'all_filled': True,
+                'filled': [],
+                'not_filled': [],
+                'on_leave': [],
+                'exception_day': exception_day_users,
+                'is_holiday': False,
+                'fill_rate': 1.0
+            }
+        
+        self.log.info(f"{date_str} 是{self.get_weekday_name(date_str)}")
+        self.log.success(f"需要检查 {len(user_names)} 名人员")
         
         if not self.app_token or not self.table_id:
             self.log.error("缺少app_token或table_id，请在初始化时设置")
@@ -849,28 +828,33 @@ class BitableAPI:
             }
         
         try:
-            # 先获取最近的所有记录来建立user_id映射（用于@功能）
-            self.log.info("正在获取用户ID映射...")
-            all_recent_records = self.get_records(page_size=500)  # 获取最近500条记录来建立映射
-            user_id_map = {}  # 存储姓名到user_id的映射
-            
-            for record in all_recent_records:
-                fields = record.get('fields', {})
-                user_info = fields.get(user_field, {})
+            # 优先使用外部提供的user_id映射（从群成员API获取的open_id）
+            if external_user_id_map:
+                user_id_map = external_user_id_map.copy()
+                self.log.success(f"使用外部提供的用户ID映射，共 {len(user_id_map)} 个用户")
+            else:
+                # 如果没有外部映射，从Bitable历史记录中建立映射
+                self.log.info("正在从Bitable记录获取用户ID映射...")
+                all_recent_records = self.get_records(page_size=500)  # 获取最近500条记录来建立映射
+                user_id_map = {}  # 存储姓名到user_id的映射
                 
-                # 提取user_id
-                if isinstance(user_info, dict):
-                    user_name = user_info.get('name', '')
-                    user_id = user_info.get('id', '')
-                    if user_name and user_id and user_name not in user_id_map:
-                        user_id_map[user_name] = user_id
-                elif isinstance(user_info, list) and len(user_info) > 0:
-                    user_name = user_info[0].get('name', '') if isinstance(user_info[0], dict) else ''
-                    user_id = user_info[0].get('id', '') if isinstance(user_info[0], dict) else ''
-                    if user_name and user_id and user_name not in user_id_map:
-                        user_id_map[user_name] = user_id
-            
-            self.log.success(f"已建立 {len(user_id_map)} 个用户的ID映射")
+                for record in all_recent_records:
+                    fields = record.get('fields', {})
+                    user_info = fields.get(user_field, {})
+                    
+                    # 提取user_id
+                    if isinstance(user_info, dict):
+                        user_name = user_info.get('name', '')
+                        user_id = user_info.get('id', '')
+                        if user_name and user_id and user_name not in user_id_map:
+                            user_id_map[user_name] = user_id
+                    elif isinstance(user_info, list) and len(user_info) > 0:
+                        user_name = user_info[0].get('name', '') if isinstance(user_info[0], dict) else ''
+                        user_id = user_info[0].get('id', '') if isinstance(user_info[0], dict) else ''
+                        if user_name and user_id and user_name not in user_id_map:
+                            user_id_map[user_name] = user_id
+                
+                self.log.success(f"已从Bitable建立 {len(user_id_map)} 个用户的ID映射")
             
             # 获取指定日期的所有记录
             records = self.get_records_by_date("记录时间", date_str, convert_timestamp=False)
@@ -923,25 +907,21 @@ class BitableAPI:
             else:
                 print(f"\n所有人员都已填写！")
             
-            # 获取请假人员和例外日期人员列表
-            on_leave = self._get_on_leave_people(config_path)
-            exception_day = self._get_exception_day_people(config_path, date_str)
-            
             # 检查未填写人员中是否有人请假（一次性批量查询）
             on_leave_from_calendar = []
             if not_filled_with_id and date_str:
                 print(f"\n检查未填写人员的请假状态...")
                 
                 # 一次性获取当天所有请假人员的 open_id 集合和姓名映射
-                leave_user_ids, leave_id_to_name = self.get_leave_users_on_date(date_str, config_path)
+                leave_user_ids, leave_id_to_name = self.get_leave_users_on_date(date_str, None)
                 
                 if leave_user_ids:
                     print(f"\n   开始匹配未填写人员...")
                     
                     # 创建 open_id 到姓名的反向映射
-                    # 优先级：people.json 配置 > Bitable 记录
+                    # 使用群成员API获取的映射和审批记录映射
                     id_to_name = {v: k for k, v in user_id_map.items()}
-                    id_to_name.update(leave_id_to_name)  # people.json 的映射优先级更高
+                    id_to_name.update(leave_id_to_name)  # 审批记录的映射会覆盖
                     
                     # 显示请假人员信息（带姓名）
                     leave_info = []
@@ -971,21 +951,17 @@ class BitableAPI:
                     not_filled = [name for name in not_filled if name not in on_leave_from_calendar]
                     not_filled_with_id = [u for u in not_filled_with_id if u['name'] not in on_leave_from_calendar]
                     # 重新计算填写率
-                    total_expected = len(user_names) - len(on_leave_from_calendar) - len(on_leave)
+                    total_expected = len(user_names) - len(on_leave_from_calendar)
                     fill_rate = len(filled) / total_expected if total_expected > 0 else 1.0
                     all_filled = len(not_filled) == 0
-            
-            # 合并配置文件中的请假人员和日历中的请假人员
-            all_on_leave = list(set(on_leave + on_leave_from_calendar))
             
             return {
                 'all_filled': all_filled,
                 'filled': filled,
                 'not_filled': not_filled,
                 'not_filled_with_id': not_filled_with_id,  # 包含user_id的未填写人员（已排除请假）
-                'on_leave': all_on_leave,
-                'on_leave_from_calendar': on_leave_from_calendar,  # 从日历查询到的请假人员
-                'exception_day': exception_day,
+                'on_leave': on_leave_from_calendar,  # 从日历查询到的请假人员
+                'exception_day': exception_day_users,  # 例外日期人员
                 'is_holiday': is_holiday,
                 'fill_rate': fill_rate
             }
@@ -1001,55 +977,3 @@ class BitableAPI:
                 'is_holiday': False,
                 'fill_rate': 0.0
             }
-    
-    @staticmethod
-    def _get_on_leave_people(config_path: str = None):
-        """获取请假人员列表"""
-        if not config_path:
-            # bitable.py 在 backend/utils/feishu/ 下，需要往上3层到达 backend/
-            backend_dir = Path(__file__).parent.parent.parent
-            config_path = backend_dir / "config" / "people.json"
-        
-        try:
-            with open(config_path, 'r', encoding='utf-8') as f:
-                config = json.load(f)
-            
-            # 返回请假的人员（off: true）
-            on_leave = [
-                person['name'] 
-                for person in config.get('people', []) 
-                if person.get('off', False)
-            ]
-            
-            return on_leave
-        except:
-            return []
-    
-    @staticmethod
-    def _get_exception_day_people(config_path: str = None, date_str: str = None):
-        """获取例外日期的人员列表"""
-        if not config_path:
-            # bitable.py 在 backend/utils/feishu/ 下，需要往上3层到达 backend/
-            backend_dir = Path(__file__).parent.parent.parent
-            config_path = backend_dir / "config" / "people.json"
-        
-        if not date_str:
-            return []
-        
-        try:
-            with open(config_path, 'r', encoding='utf-8') as f:
-                config = json.load(f)
-            
-            weekday = BitableAPI.get_weekday_name(date_str)
-            
-            # 返回例外日期的人员
-            exception_people = [
-                person['name'] 
-                for person in config.get('people', []) 
-                if weekday in person.get('exceptions', []) and not person.get('off', False)
-            ]
-            
-            return exception_people
-        except:
-            return []
-

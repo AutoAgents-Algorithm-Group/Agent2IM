@@ -1,0 +1,35 @@
+# 飞书应用
+feishu:
+  app_id: "cli_a87352e3c577900e"
+  app_secret: "DlVXx6WbRuDh4PnJkhZeUpjlaXcthWwY"
+
+# 审批定义编码
+approval_codes:
+  leave:
+    - "A9D489DC-5F55-4418-99F1-01E1CE734CA1"  # 请勤审批
+
+# 日历配置（可选）
+calendar:
+  enabled: true  # 是否自动创建日历事件
+  default_calendar_id: ""  # 默认日历ID（留空则使用用户默认日历）
+  
+  # 日历事件配置
+  event:
+    title_template: "{user_name} - 请假"
+    description_template: |
+      请假类型：{leave_type}
+      开始时间：{start_time}
+      结束时间：{end_time}
+      请假时长：{duration}
+      审批编号：{instance_code}
+    
+    # 事件颜色（1-11）
+    color: 7  # 淡蓝色
+    
+    # 是否发送通知
+    send_notifications: false
+
+# 通知配置（可选）
+notifications:
+  # 是否启用通知
+  enabled: false

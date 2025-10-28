@@ -4,7 +4,7 @@
 支持新闻推送和工时检查任务
 """
 
-import json
+import yaml
 from pathlib import Path
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -14,9 +14,8 @@ import pytz
 import sys
 import os
 
-from src.service.news_service import run_news_and_publish
-from src.service.labor_hour_service import run_labor_hour_check_from_config, LaborHourService
-import json as json_lib
+from src.service.feishu.news import run_news_and_publish
+from src.service.feishu import LaborHourManager
 
 
 class UnifiedScheduler:
@@ -50,32 +49,55 @@ class UnifiedScheduler:
         print(f"   时区: {self.timezone}")
     
     def load_config(self):
-        """加载配置文件"""
-        config_file = self.config_dir / "scheduled_tasks.json"
+        """加载配置文件 - 从 labor_hour.yaml 和 news.yaml 合并任务配置"""
+        all_tasks = []
+        timezone = "Asia/Shanghai"
         
-        # 如果不存在，尝试使用example文件
-        if not config_file.exists():
-            example_file = self.config_dir / "scheduled_tasks.example.json"
-            if example_file.exists():
-                print(f"⚠️ 未找到 scheduled_tasks.json，使用示例配置")
-                config_file = example_file
-            else:
-                print(f"❌ 未找到配置文件")
-                self.config = {"timezone": "Asia/Shanghai", "tasks": []}
-                self.timezone = "Asia/Shanghai"
-                return
+        # 1. 加载 labor_hour.yaml
+        labor_config_file = self.config_dir / "labor_hour.yaml"
+        if labor_config_file.exists():
+            try:
+                with open(labor_config_file, 'r', encoding='utf-8') as f:
+                    labor_config = yaml.safe_load(f)
+                
+                # 获取时区
+                timezone = labor_config.get('schedules', {}).get('timezone', timezone)
+                
+                # 获取任务
+                labor_tasks = labor_config.get('schedules', {}).get('tasks', [])
+                all_tasks.extend(labor_tasks)
+                
+                print(f"✅ 成功加载 labor_hour.yaml，{len(labor_tasks)} 个任务")
+            except Exception as e:
+                print(f"⚠️ 加载 labor_hour.yaml 失败: {e}")
+        else:
+            print(f"⚠️ 未找到 labor_hour.yaml")
         
-        try:
-            with open(config_file, 'r', encoding='utf-8') as f:
-                self.config = json.load(f)
-            
-            self.timezone = self.config.get("timezone", "Asia/Shanghai")
-            print(f"✅ 成功加载配置文件: {config_file}")
-            
-        except Exception as e:
-            print(f"❌ 加载配置文件失败: {e}")
-            self.config = {"timezone": "Asia/Shanghai", "tasks": []}
-            self.timezone = "Asia/Shanghai"
+        # 2. 加载 news.yaml
+        news_config_file = self.config_dir / "news.yaml"
+        if news_config_file.exists():
+            try:
+                with open(news_config_file, 'r', encoding='utf-8') as f:
+                    news_config = yaml.safe_load(f)
+                
+                # 获取任务
+                news_tasks = news_config.get('schedules', {}).get('tasks', [])
+                all_tasks.extend(news_tasks)
+                
+                print(f"✅ 成功加载 news.yaml，{len(news_tasks)} 个任务")
+            except Exception as e:
+                print(f"⚠️ 加载 news.yaml 失败: {e}")
+        else:
+            print(f"⚠️ 未找到 news.yaml")
+        
+        # 合并配置
+        self.config = {
+            "timezone": timezone,
+            "tasks": all_tasks
+        }
+        self.timezone = timezone
+        
+        print(f"✅ 配置加载完成，共 {len(all_tasks)} 个任务")
     
     def setup_tasks(self):
         """设置所有定时任务"""
@@ -96,10 +118,11 @@ class UnifiedScheduler:
                 if task_type == "news":
                     job_func = self.run_news_task
                 elif task_type == "labor_hour":
-                    check_date = task.get("check_date", "today")
-                    job_func = lambda cd=check_date: self.run_labor_hour_task(cd)
-                elif task_type == "labor_week_summary":
-                    job_func = self.run_week_summary_task
+                    offset = task.get("offset", 0)  # 默认为0（今天）
+                    job_func = lambda o=offset: self.run_labor_hour_task(o)
+                elif task_type == "labor_month_summary":
+                    mention_users = task.get("mention_users", [])
+                    job_func = lambda mu=mention_users: self.run_month_summary_task(mu)
                 else:
                     print(f"⚠️ 未知的任务类型: {task_type}")
                     continue
@@ -173,16 +196,22 @@ class UnifiedScheduler:
             traceback.print_exc()
             print(f"{'='*80}\n")
     
-    def run_labor_hour_task(self, check_date: str = "today"):
-        """执行工时检查任务"""
+    def run_labor_hour_task(self, offset: int = 0):
+        """
+        执行工时检查任务
+        
+        Args:
+            offset: 日期偏移量，-1=昨天，0=今天，1=明天
+        """
         try:
             print(f"\n{'='*80}")
             print(f"⏰ 执行定时任务: 工时检查")
             print(f"   时间: {datetime.now(pytz.timezone(self.timezone)).strftime('%Y-%m-%d %H:%M:%S')}")
-            print(f"   检查日期: {check_date}")
+            print(f"   日期偏移: {offset} ({'昨天' if offset == -1 else '今天' if offset == 0 else '明天' if offset == 1 else f'{offset}天'})")
             print(f"{'='*80}\n")
             
-            result = run_labor_hour_check_from_config()
+            # 使用 LaborHourManager 的统一接口
+            result = LaborHourManager.check(offset=offset)
             
             if result and result.get('status') == 'success':
                 print(f"\n✅ 工时检查任务完成")
@@ -197,40 +226,28 @@ class UnifiedScheduler:
             traceback.print_exc()
             print(f"{'='*80}\n")
     
-    def run_week_summary_task(self):
-        """执行周总结任务"""
+    def run_month_summary_task(self, mention_users: list = None):
+        """执行月度总结任务"""
         try:
             print(f"\n{'='*80}")
-            print(f"⏰ 执行定时任务: 工时周报")
+            print(f"⏰ 执行定时任务: 工时月报")
             print(f"   时间: {datetime.now(pytz.timezone(self.timezone)).strftime('%Y-%m-%d %H:%M:%S')}")
+            if mention_users:
+                print(f"   @人员: {', '.join(mention_users)}")
             print(f"{'='*80}\n")
             
-            # 读取配置文件
-            config_file = self.config_dir / "labor_hour.json"
-            with open(config_file, 'r', encoding='utf-8') as f:
-                config = json_lib.load(f)
-            
-            # 创建服务实例
-            service = LaborHourService(
-                app_id=config['feishu']['app_id'],
-                app_secret=config['feishu']['app_secret'],
-                bitable_url=config['bitable']['url'],
-                webhook_url=config['webhook']['url'],
-                webhook_secret=config['webhook']['secret']
-            )
-            
-            # 运行周总结
-            result = service.run_week_summary_and_publish()
+            # 运行月度总结
+            result = LaborHourManager.monthly_summary(mention_users=mention_users)
             
             if result and result.get('status') == 'success':
-                print(f"\n✅ 工时周报任务完成")
+                print(f"\n✅ 工时月报任务完成")
             else:
-                print(f"\n⚠️ 工时周报任务完成，但可能存在问题")
+                print(f"\n⚠️ 工时月报任务完成，但可能存在问题")
             
             print(f"{'='*80}\n")
             
         except Exception as e:
-            print(f"\n❌ 工时周报任务失败: {e}")
+            print(f"\n❌ 工时月报任务失败: {e}")
             import traceback
             traceback.print_exc()
             print(f"{'='*80}\n")

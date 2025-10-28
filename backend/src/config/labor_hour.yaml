@@ -1,0 +1,56 @@
+# 飞书应用
+feishu:
+  app_id: "cli_a87352e3c577900e"
+  app_secret: "DlVXx6WbRuDh4PnJkhZeUpjlaXcthWwY"
+
+# 多维表格
+bitable:
+  url: "https://uxkpl4cba3j.feishu.cn/base/UfDPbov0Eai3RpsWAEBcyfe1nAb?table=tbla3OuZeDczpqZx&view=vewGyZRz6D"
+
+# 群聊配置
+group_chat:
+  chat_id: "oc_f4af22a11abbc9b68034b1b639a32cd7"
+  # 排除成员 - 这些人完全不参与工时检查
+  exclude_members:
+    - "邹阳"
+    - "杨劲松"
+    - "高乐奇"
+    - "邹鹏飞"
+    - "张建全"
+  # 例外日期配置 - 某些人在特定星期几不需要填写工时
+  exceptions:
+    滕凯:
+      - "星期二"
+
+# 定时任务配置
+schedules:
+  timezone: "Asia/Shanghai"
+  tasks:
+    # 每天晚上 19:30 检查当天工时
+    - id: "labor_evening_check"
+      name: "工时检查 - 晚上19:30"
+      type: "labor_hour"
+      enabled: true
+      schedule: "19:30"
+      offset: 0  # 0=今天
+      description: "工作日晚上19:30检查当天工时填写情况"
+    
+    # 第二天早上 10:30 检查昨天工时
+    - id: "labor_morning_makeup"
+      name: "工时检查 - 早上10:30补填提醒"
+      type: "labor_hour"
+      enabled: true
+      schedule: "10:30"
+      offset: -1  # -1=昨天
+      description: "早上10:30提醒昨天未填写的人补填工时"
+    
+    # 每月 28 号上午 10:00 发送月报
+    - id: "labor_month_summary"
+      name: "工时月报 - 每月28号"
+      type: "labor_month_summary"
+      enabled: true
+      schedule: "cron"
+      cron: "0 10 28 * *"
+      mention_users:
+        - "刘华鑫"
+      description: "每月28号总结过去一个月的工时填写情况，并@刘华鑫"
