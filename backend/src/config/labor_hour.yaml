@@ -9,7 +9,7 @@ bitable:
 
 # 群聊配置
 group_chat:
-  chat_id: "oc_f4af22a11abbc9b68034b1b639a32cd7"
+  chat_id: "oc_64bcf6b8ab56981e2883998114b9733e"
   # 排除成员 - 这些人完全不参与工时检查
   exclude_members:
     - "邹阳"
