@@ -53,14 +53,89 @@ class ApprovalService:
             event_type = event_data.get('event', {}).get('type')
             
             if event_type == 'approval_instance':
-                # 审批实例事件
+                # 审批实例事件（通用格式，需要调用API获取详情）
                 return self._handle_approval_instance(event_data)
+            elif event_type == 'leave_approval':
+                # 请假审批事件（请假信息已包含在事件中）
+                return self._handle_leave_approval(event_data)
             else:
                 print(f"⚠️ 未知的审批事件类型: {event_type}")
                 return {"status": "ignored", "reason": f"unknown event type: {event_type}"}
                 
         except Exception as e:
             print(f"❌ 处理审批事件失败: {e}")
+            import traceback
+            traceback.print_exc()
+            return {"status": "error", "message": str(e)}
+    
+    def _handle_leave_approval(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        处理请假审批事件（请假信息已包含在事件中）
+        
+        Args:
+            event_data: 审批事件数据
+        
+        Returns:
+            处理结果
+        """
+        try:
+            event = event_data.get('event', {})
+            
+            # 获取审批定义编码
+            approval_code = event.get('approval_code', '')
+            
+            # 只处理白名单中的审批类型
+            if approval_code and approval_code not in self.leave_approval_codes:
+                print(f"⏭️ 审批类型 {approval_code} 不在处理范围内，跳过")
+                return {"status": "ignored", "reason": f"approval_code {approval_code} not in whitelist"}
+            
+            print(f"✅ 收到请假审批事件")
+            
+            # 获取审批实例编码和申请人信息
+            instance_code = event.get('instance_code', '')
+            open_id = event.get('open_id', '')
+            employee_id = event.get('employee_id', '')
+            
+            # 获取请假信息
+            leave_type = event.get('leave_type', '请假')
+            leave_start_time = event.get('leave_start_time', '')
+            leave_end_time = event.get('leave_end_time', '')
+            leave_reason = event.get('leave_reason', '请假审批已通过')
+            
+            print(f"📋 审批信息:")
+            print(f"   审批定义: {approval_code}")
+            print(f"   实例编码: {instance_code}")
+            print(f"   申请人: {employee_id} / {open_id}")
+            print(f"   请假类型: {leave_type}")
+            print(f"   请假时间: {leave_start_time} ~ {leave_end_time}")
+            print(f"   请假原因: {leave_reason}")
+            
+            # 验证必填字段
+            if not (open_id and leave_start_time and leave_end_time):
+                print(f"⚠️ 请假信息不完整")
+                return {"status": "error", "message": "请假信息不完整"}
+            
+            # 创建请假日历
+            calendar_result = self._create_timeoff_event(
+                user_id=open_id,
+                start_time=leave_start_time,
+                end_time=leave_end_time,
+                title=f'{leave_type}(全天) / Time Off',
+                description=f"{leave_type}: {leave_reason}"
+            )
+            
+            if calendar_result.get('status') == 'success':
+                print(f"✅ 请假日历创建成功")
+                return {
+                    "status": "success",
+                    "message": "请假日历创建成功",
+                    "calendar_event_id": calendar_result.get('event_id')
+                }
+            else:
+                return calendar_result
+                
+        except Exception as e:
+            print(f"❌ 处理请假审批事件失败: {e}")
             import traceback
             traceback.print_exc()
             return {"status": "error", "message": str(e)}

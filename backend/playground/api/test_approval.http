@@ -5,21 +5,237 @@
 @host = http://localhost:9000
 @remote_host = http://45.78.224.30:9000
 
-# 
+###############################################################################
+# 1. 健康检查
+###############################################################################
+
+### 1.1 本地健康检查
+GET {{host}}/health
+
+### 1.2 远程健康检查
+GET {{remote_host}}/health
+
+###############################################################################
+# 2. 真实飞书审批事件格式（请假审批 - leave_approval）
+###############################################################################
+
+### 2.1 真实请假审批事件（本地测试）
+POST {{host}}/feishu/approval
+Content-Type: application/json
+
+{
+  "ts": "1502199207.7171419",
+  "uuid": "bc447199585340d1f3728d26b1c0297a",
+  "token": "41a9425ea7df4536a7623e38fa321bae",
+  "type": "event_callback",
+  "event": {
+    "app_id": "cli_9e28cb7ba56a1234",
+    "approval_code": "A9D489DC-5F55-4418-99F1-01E1CE734CA1",
+    "instance_code": "CEF48CEE-CEF4-45C9-1234-DCBF8BEC1234",
+    "employee_id": "g6964xxx",
+    "open_id": "ou_xxx",
+    "start_time": 1589527346,
+    "end_time": 1589527354,
+    "leave_type": "事假",
+    "leave_start_time": "2024-09-05 12:00:00",
+    "leave_end_time": "2024-09-07 00:00:00",
+    "leave_interval": 129600,
+    "leave_unit": 2,
+    "leave_reason": "请假审批",
+    "tenant_key": "bd6ae59e1xxx",
+    "type": "leave_approval"
+  }
+}
+
+### 2.2 真实请假审批事件（远程测试）
+POST {{remote_host}}/feishu/approval
+Content-Type: application/json
+
+{
+  "ts": "1502199207.7171419",
+  "uuid": "bc447199585340d1f3728d26b1c0297a_remote",
+  "token": "41a9425ea7df4536a7623e38fa321bae",
+  "type": "event_callback",
+  "event": {
+    "app_id": "cli_9e28cb7ba56a1234",
+    "approval_code": "A9D489DC-5F55-4418-99F1-01E1CE734CA1",
+    "instance_code": "CEF48CEE-CEF4-45C9-1234-DCBF8BEC1235",
+    "employee_id": "g6964xxx",
+    "open_id": "ou_xxx",
+    "start_time": 1589527346,
+    "end_time": 1589527354,
+    "leave_type": "年假",
+    "leave_start_time": "2024-11-01 00:00:00",
+    "leave_end_time": "2024-11-03 23:59:59",
+    "leave_interval": 259199,
+    "leave_unit": 2,
+    "leave_reason": "年假出游",
+    "tenant_key": "bd6ae59e1xxx",
+    "type": "leave_approval"
+  }
+}
+
+###############################################################################
+# 3. URL 验证测试（飞书首次配置时会发送）
+###############################################################################
+
+### 3.1 本地 URL 验证
+POST {{host}}/feishu/approval
+Content-Type: application/json
+
+{
+  "type": "url_verification",
+  "challenge": "test_challenge_12345"
+}
+
+### 3.2 远程 URL 验证
+POST {{remote_host}}/feishu/approval
+Content-Type: application/json
+
+{
+  "type": "url_verification",
+  "challenge": "test_challenge_12345"
+}
+
+###############################################################################
+# 4. 通用审批实例事件（approval_instance）
+###############################################################################
+
+### 4.1 通用审批事件（本地测试）
 POST {{host}}/feishu/approval
 Content-Type: application/json
 
 {
   "type": "event_callback",
-  "event_id": "performance_test_001",
+  "event_id": "test_event_001",
+  "token": "test_token",
+  "ts": "1635840000",
+  "uuid": "test_uuid_001",
   "event": {
     "type": "approval_instance",
     "status": "APPROVED",
     "approval_code": "A9D489DC-5F55-4418-99F1-01E1CE734CA1",
-    "instance_code": "PERF_INSTANCE_001",
-    "user_id": "ou_perf_test",
-    "open_id": "ou_perf_test",
+    "instance_code": "81D31358-93AF-92C6-7425-01A5D67C4E71",
+    "user_id": "ou_9210e6e39f53c7658a5fe518783a2f3e",
+    "open_id": "ou_9210e6e39f53c7658a5fe518783a2f3e",
     "start_time": "2025-10-27",
     "end_time": "2025-10-28"
   }
 }
+
+###############################################################################
+# 5. 幂等性测试
+###############################################################################
+
+### 5.1 相同 UUID 的重复请求（第一次）
+POST {{host}}/feishu/approval
+Content-Type: application/json
+
+{
+  "ts": "1502199207.7171419",
+  "uuid": "duplicate_test_uuid_001",
+  "token": "41a9425ea7df4536a7623e38fa321bae",
+  "type": "event_callback",
+  "event": {
+    "approval_code": "A9D489DC-5F55-4418-99F1-01E1CE734CA1",
+    "instance_code": "TEST_IDEMPOTENT_001",
+    "open_id": "ou_test",
+    "leave_type": "病假",
+    "leave_start_time": "2024-12-01 00:00:00",
+    "leave_end_time": "2024-12-02 00:00:00",
+    "leave_reason": "身体不适",
+    "type": "leave_approval"
+  }
+}
+
+### 5.2 相同 UUID 的重复请求（第二次，应该被忽略）
+POST {{host}}/feishu/approval
+Content-Type: application/json
+
+{
+  "ts": "1502199207.7171419",
+  "uuid": "duplicate_test_uuid_001",
+  "token": "41a9425ea7df4536a7623e38fa321bae",
+  "type": "event_callback",
+  "event": {
+    "approval_code": "A9D489DC-5F55-4418-99F1-01E1CE734CA1",
+    "instance_code": "TEST_IDEMPOTENT_001",
+    "open_id": "ou_test",
+    "leave_type": "病假",
+    "leave_start_time": "2024-12-01 00:00:00",
+    "leave_end_time": "2024-12-02 00:00:00",
+    "leave_reason": "身体不适",
+    "type": "leave_approval"
+  }
+}
+
+###############################################################################
+# 6. 其他接口测试
+###############################################################################
+
+### 6.1 获取根路径信息
+GET {{host}}/
+
+### 6.2 获取调度器状态
+GET {{host}}/feishu/schedule/status
+
+### 6.3 获取调度器任务列表
+GET {{host}}/feishu/schedule/jobs
+
+### 6.4 查看 API 文档
+GET {{host}}/docs
+
+###############################################################################
+# 测试说明
+###############################################################################
+
+# API 端点:
+# - POST /feishu/approval - 飞书审批回调接口
+
+# 事件类型说明:
+# 1. leave_approval (推荐)
+#    - 飞书实际发送的请假审批事件格式
+#    - 请假信息已包含在事件中（leave_type, leave_start_time, leave_end_time, leave_reason）
+#    - 不需要调用额外的API获取详情
+#    - 更高效，响应更快
+#
+# 2. approval_instance (通用格式)
+#    - 通用审批实例事件格式
+#    - 需要调用飞书API获取审批详情
+#    - 适用于各种类型的审批
+#    - 需要额外的API调用，响应较慢
+
+# 测试顺序建议:
+# 1. 先测试健康检查 (1.1) - 确认服务运行正常
+# 2. 测试 URL 验证 (3.1) - 模拟飞书首次配置webhook
+# 3. 测试真实请假审批事件 (2.1) - 测试 leave_approval 类型
+# 4. 测试通用审批事件 (4.1) - 测试 approval_instance 类型
+# 5. 测试幂等性 (5.1, 5.2) - 确认相同事件不会重复处理
+
+# 预期结果:
+# - 健康检查: {"status":"ok"}
+# - URL 验证: {"challenge":"test_challenge_12345"}
+# - 审批事件: {"code":0,"msg":"success"}
+# - 幂等性: 第二次请求日志显示 "事件已处理，跳过"
+
+# 配置说明:
+# 1. 飞书审批配置: backend/src/config/approval.yaml
+# 2. 审批代码白名单: approval_codes.leave
+#    - 只有白名单中的 approval_code 才会被处理
+#    - 默认: A9D489DC-5F55-4418-99F1-01E1CE734CA1
+
+# 注意事项:
+# 1. 本地测试使用 {{host}} 变量 (http://localhost:9000)
+# 2. 远程测试使用 {{remote_host}} 变量（需要修改 IP）
+# 3. 测试前确保服务已启动:
+#    - 开发: make dev 或 python backend/src/api/main.py
+#    - Docker: docker compose -f docker/docker-compose.yml up -d api
+# 4. 查看日志:
+#    - 开发: 控制台输出
+#    - Docker: docker compose -f docker/docker-compose.yml logs -f api
+# 5. approval_code 必须在 approval.yaml 的白名单中，否则会被忽略
+
+# 相关文档:
+# - 飞书审批事件: https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/approval-v4/approval/events/approval_instance_status_changed
+# - API 路由: backend/src/api/feishu/approval.py
+# - 服务逻辑: backend/src/service/feishu/approval.py
