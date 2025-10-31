@@ -1,0 +1,25 @@
+### 飞书审批回调接口测试
+### 使用方法: 在 VSCode 中安装 REST Client 插件，点击 "Send Request" 发送请求
+
+# 配置变量
+@host = http://localhost:9000
+@remote_host = http://45.78.224.30:9000
+
+# 
+POST {{host}}/feishu/approval
+Content-Type: application/json
+
+{
+  "type": "event_callback",
+  "event_id": "performance_test_001",
+  "event": {
+    "type": "approval_instance",
+    "status": "APPROVED",
+    "approval_code": "A9D489DC-5F55-4418-99F1-01E1CE734CA1",
+    "instance_code": "PERF_INSTANCE_001",
+    "user_id": "ou_perf_test",
+    "open_id": "ou_perf_test",
+    "start_time": "2025-10-27",
+    "end_time": "2025-10-28"
+  }
+}

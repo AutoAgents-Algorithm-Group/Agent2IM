@@ -2,7 +2,6 @@
 定时任务调度模块
 """
 
-from .scheduler import ReminderScheduler
+from .unified_scheduler import UnifiedScheduler
 
-__all__ = ['ReminderScheduler']
-
+__all__ = ['UnifiedScheduler']

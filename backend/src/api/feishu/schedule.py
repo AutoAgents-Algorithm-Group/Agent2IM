@@ -11,14 +11,12 @@ router = APIRouter(prefix="/feishu/schedule", tags=["feishu-schedule"])
 
 # 调度器实例（由 main.py 注入）
 _unified_scheduler: Optional[object] = None
-_reminder_scheduler: Optional[object] = None
 
 
-def set_schedulers(unified=None, reminder=None):
+def set_schedulers(unified=None):
     """设置调度器实例（由 main.py 调用）"""
-    global _unified_scheduler, _reminder_scheduler
+    global _unified_scheduler
     _unified_scheduler = unified
-    _reminder_scheduler = reminder
 
 
 @router.get("/status")
@@ -37,11 +35,6 @@ def get_scheduler_status():
         job_count = len(_unified_scheduler.scheduler.get_jobs())
         scheduler_type = "unified"
         timezone = _unified_scheduler.timezone
-    elif _reminder_scheduler:
-        is_running = _reminder_scheduler.scheduler.running
-        job_count = len(_reminder_scheduler.scheduler.get_jobs())
-        scheduler_type = "reminder"
-        timezone = _reminder_scheduler.timezone
     else:
         return {
             "status": "not_initialized",
@@ -71,9 +64,6 @@ def get_scheduler_jobs():
     if _unified_scheduler:
         jobs = _unified_scheduler.scheduler.get_jobs()
         scheduler_type = "unified"
-    elif _reminder_scheduler:
-        jobs = _reminder_scheduler.scheduler.get_jobs()
-        scheduler_type = "reminder"
     else:
         return {
             "status": "error",

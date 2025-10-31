@@ -17,15 +17,13 @@ current_dir = PathLib(__file__).parent
 src_dir = current_dir.parent
 sys.path.insert(0, str(src_dir))
 
-from src.utils.schedule import ReminderScheduler
 from src.utils.schedule.unified_scheduler import UnifiedScheduler
 from src.api.feishu import chat, approval, schedule
 
 
 # 全局调度器实例
 app_state = {
-    "unified_scheduler": None,
-    "reminder_scheduler": None
+    "unified_scheduler": None
 }
 
 
@@ -44,11 +42,11 @@ async def lifespan(app: FastAPI):
     # 获取配置文件目录 (从 src/api/ 回到 src/config/)
     config_dir = PathLib(__file__).parent.parent / "config"
     
-    # 检查是否启用统一调度器（通过环境变量控制）
-    use_unified_scheduler = os.environ.get('USE_UNIFIED_SCHEDULER', 'false').lower() == 'true'
+    # 检查是否启用统一调度器（通过环境变量控制，默认启用）
+    use_unified_scheduler = os.environ.get('USE_UNIFIED_SCHEDULER', 'true').lower() == 'true'
     
     if use_unified_scheduler:
-        # 使用新的统一调度器（包含新闻推送和工时检查）
+        # 使用新的统一调度器（包含工时检查和新闻推送）
         try:
             print("🚀 正在启动统一定时任务调度器...")
             unified_scheduler = UnifiedScheduler(config_dir=str(config_dir))
@@ -61,23 +59,14 @@ async def lifespan(app: FastAPI):
             print("✅ 统一定时任务调度器启动成功")
         except Exception as e:
             print(f"❌ 启动统一定时任务调度器失败: {e}")
+            import traceback
+            traceback.print_exc()
             print("⚠️ 应用将继续运行，但定时任务功能不可用")
     else:
-        # 使用旧的提醒调度器（仅工时检查提醒）
-        try:
-            print("🚀 正在启动定时任务调度器...")
-            reminder_scheduler = ReminderScheduler(config_dir=str(config_dir))
-            reminder_scheduler.init_feishu_service(ai_service=None)
-            reminder_scheduler.start()
-            app_state["reminder_scheduler"] = reminder_scheduler
-            
-            # 注入到 schedule 路由
-            schedule.set_schedulers(reminder=reminder_scheduler)
-            
-            print("✅ 定时任务调度器启动成功")
-        except Exception as e:
-            print(f"❌ 启动定时任务调度器失败: {e}")
-            print("⚠️ 应用将继续运行，但定时任务功能不可用")
+        # 旧的调度器已废弃，不再支持
+        print("⚠️ 旧的调度器（ReminderScheduler）已废弃")
+        print("⚠️ 请设置环境变量 USE_UNIFIED_SCHEDULER=true 使用新的统一调度器")
+        print("⚠️ 应用将继续运行，但定时任务功能不可用")
     
     print("=" * 80)
     print("✅ Agent2IM 启动完成")
@@ -96,10 +85,6 @@ async def lifespan(app: FastAPI):
             print("🛑 正在停止统一定时任务调度器...")
             app_state["unified_scheduler"].stop()
             print("✅ 统一定时任务调度器已停止")
-        elif app_state["reminder_scheduler"]:
-            print("🛑 正在停止定时任务调度器...")
-            app_state["reminder_scheduler"].stop()
-            print("✅ 定时任务调度器已停止")
     except Exception as e:
         print(f"❌ 停止定时任务调度器失败: {e}")
     
@@ -131,16 +116,11 @@ def read_root():
     """
     # 获取调度器状态
     unified_scheduler = app_state["unified_scheduler"]
-    reminder_scheduler = app_state["reminder_scheduler"]
     
     if unified_scheduler:
         scheduler_status = "running" if unified_scheduler.scheduler.running else "stopped"
         job_count = len(unified_scheduler.scheduler.get_jobs())
         scheduler_type = "unified"
-    elif reminder_scheduler:
-        scheduler_status = "running" if reminder_scheduler.scheduler.running else "stopped"
-        job_count = len(reminder_scheduler.scheduler.get_jobs())
-        scheduler_type = "reminder"
     else:
         scheduler_status = "not_initialized"
         job_count = 0
