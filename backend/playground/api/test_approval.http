@@ -25,15 +25,12 @@ Content-Type: application/json
 
 {
   "ts": "1502199207.7171419",
-  "uuid": "bc447199585340d1f3728d26b1c0297a",
   "token": "41a9425ea7df4536a7623e38fa321bae",
   "type": "event_callback",
   "event": {
-    "app_id": "cli_9e28cb7ba56a1234",
+    "app_id": "cli_a875a7a04178100c",
     "approval_code": "A9D489DC-5F55-4418-99F1-01E1CE734CA1",
-    "instance_code": "CEF48CEE-CEF4-45C9-1234-DCBF8BEC1234",
-    "employee_id": "g6964xxx",
-    "open_id": "ou_xxx",
+    "open_id": "ou_8e5d3e4bbaf3118cdabfecf6ca3072d4",
     "start_time": 1589527346,
     "end_time": 1589527354,
     "leave_type": "事假",
@@ -42,7 +39,6 @@ Content-Type: application/json
     "leave_interval": 129600,
     "leave_unit": 2,
     "leave_reason": "请假审批",
-    "tenant_key": "bd6ae59e1xxx",
     "type": "leave_approval"
   }
 }
@@ -170,7 +166,127 @@ Content-Type: application/json
 }
 
 ###############################################################################
-# 6. 其他接口测试
+# 6. 请假审批V2事件测试（leave_approvalV2）
+###############################################################################
+
+### 6.1 请假审批V2事件（本地测试）
+POST {{host}}/feishu/approval
+Content-Type: application/json
+
+{
+  "ts": "1502199207.7171419",
+  "uuid": "bc447199585340d1f3728d26b1c0297a_v2",
+  "token": "41a9425ea7df4536a7623e38fa321bae",
+  "type": "event_callback",
+  "event": {
+    "app_id": "cli_a875a7a04178100c",
+    "approval_code": "A9D489DC-5F55-4418-99F1-01E1CE734CA1",
+    "instance_code": "CEF48CEE-CEF4-45C9-1234-DCBF8BEC1236",
+    "start_time": 1589527346,
+    "end_time": 1589527354,
+    "i18n_resources": "[{is_default=true,locale=zh_cn,texts={@i18n@7276381556766212099=事假}}]",
+    "leave_name": "@i18n@7276381556766212099",
+    "leave_certification": [],
+    "leave_detail": "[[2024-09-05 13:30:00,2024-09-05 18:00:00],[2024-09-06 09:00:00,2024-09-06 18:00:00]]",
+    "leave_difficult_labour": "",
+    "leave_family_relation_type": "",
+    "leave_start_time": "2024-09-05 00:00:00",
+    "leave_end_time": "2024-09-07 00:00:00",
+    "leave_feeding_arrive_late": 0,
+    "leave_feeding_leave_early": 0,
+    "leave_feeding_rest_daily": 0,
+    "leave_infant_num": "",
+    "leave_interval": 129600,
+    "leave_pregnancy_age": "",
+    "leave_pregnancy_check_up": "",
+    "leave_premarital_check_up": "",
+    "leave_range": "[[2024-09-05 13:30:00,2024-09-05 18:00:00],[2024-09-06 09:00:00,2024-09-06 18:00:00]]",
+    "leave_reason": "请假审批",
+    "leave_unit": "HALF_DAY",
+    "user_id": "g6964xxx",
+    "open_id": "ou_8e5d3e4bbaf3118cdabfecf6ca3072d4",
+    "origin_instance_code": "",
+    "tenant_key": "bd6ae59e1xxx",
+    "type": "leave_approvalV2"
+  }
+}
+
+### 6.2 请假审批V2事件（远程测试 - 年假）
+POST {{remote_host}}/feishu/approval
+Content-Type: application/json
+
+{
+  "ts": "1502199207.7171419",
+  "uuid": "bc447199585340d1f3728d26b1c0297a_v2_remote",
+  "token": "41a9425ea7df4536a7623e38fa321bae",
+  "type": "event_callback",
+  "event": {
+    "app_id": "cli_9e28cb7ba56a1234",
+    "approval_code": "A9D489DC-5F55-4418-99F1-01E1CE734CA1",
+    "instance_code": "CEF48CEE-CEF4-45C9-1234-DCBF8BEC1237",
+    "start_time": 1589527346,
+    "end_time": 1589527354,
+    "i18n_resources": "[{is_default=true,locale=zh_cn,texts={@i18n@7276381556766212100=年假}}]",
+    "leave_name": "@i18n@7276381556766212100",
+    "leave_certification": [],
+    "leave_detail": "[[2024-11-01 09:00:00,2024-11-01 18:00:00],[2024-11-02 09:00:00,2024-11-03 18:00:00]]",
+    "leave_start_time": "2024-11-01 00:00:00",
+    "leave_end_time": "2024-11-03 23:59:59",
+    "leave_interval": 259199,
+    "leave_reason": "年假出游",
+    "leave_unit": "DAY",
+    "user_id": "g6964xxx",
+    "open_id": "ou_xxx",
+    "origin_instance_code": "",
+    "tenant_key": "bd6ae59e1xxx",
+    "type": "leave_approvalV2"
+  }
+}
+
+###############################################################################
+# 7. 请假审批撤销事件测试（leave_approval_revert）
+###############################################################################
+
+### 7.1 请假审批撤销事件（本地测试）
+POST {{host}}/feishu/approval
+Content-Type: application/json
+
+{
+  "ts": "1502199207.7171419",
+  "uuid": "bc447199585340d1f3728d26b1c0297a_revert",
+  "token": "41a9425ea7df4536a7623e38fa321bae",
+  "type": "event_callback",
+  "event": {
+    "app_id": "cli_a875a7a04178100c",
+    "tenant_key": "bd6ae59e1xxx",
+    "type": "leave_approval_revert",
+    "instance_code": "CEF48CEE-CEF4-45C9-1234-DCBF8BEC1234",
+    "approval_code": "A9D489DC-5F55-4418-99F1-01E1CE734CA1",
+    "operate_time": 1564590532
+  }
+}
+
+### 7.2 请假审批撤销事件（远程测试）
+POST {{remote_host}}/feishu/approval
+Content-Type: application/json
+
+{
+  "ts": "1502199207.7171419",
+  "uuid": "bc447199585340d1f3728d26b1c0297a_revert_remote",
+  "token": "41a9425ea7df4536a7623e38fa321bae",
+  "type": "event_callback",
+  "event": {
+    "app_id": "cli_9e28cb7ba56a1234",
+    "tenant_key": "bd6ae59e1xxx",
+    "type": "leave_approval_revert",
+    "instance_code": "3CC91234-E23E-4DD7-1234-164D737C1234",
+    "approval_code": "A9D489DC-5F55-4418-99F1-01E1CE734CA1",
+    "operate_time": 1564590532
+  }
+}
+
+###############################################################################
+# 8. 其他接口测试
 ###############################################################################
 
 ### 6.1 获取根路径信息
@@ -193,13 +309,27 @@ GET {{host}}/docs
 # - POST /feishu/approval - 飞书审批回调接口
 
 # 事件类型说明:
-# 1. leave_approval (推荐)
-#    - 飞书实际发送的请假审批事件格式
+# 1. leave_approval (推荐 - 基础版)
+#    - 飞书发送的请假审批通过事件（基础格式）
 #    - 请假信息已包含在事件中（leave_type, leave_start_time, leave_end_time, leave_reason）
 #    - 不需要调用额外的API获取详情
 #    - 更高效，响应更快
+#    - 字段较少，适合基本场景
 #
-# 2. approval_instance (通用格式)
+# 2. leave_approvalV2 (推荐 - 增强版)
+#    - 请假审批通过事件V2版本（包含更多详细信息）
+#    - 包含更丰富的字段（leave_detail, leave_range, i18n_resources等）
+#    - 支持国际化请假类型解析
+#    - 适合需要详细信息的场景（如产假、哺乳假等特殊假期）
+#    - 当审批通过时，会同时收到 leave_approval 和 leave_approvalV2 两个事件
+#
+# 3. leave_approval_revert (撤销事件)
+#    - 请假审批撤销事件
+#    - 当已通过的审批被撤销时触发
+#    - 会删除之前创建的日历事件
+#    - 注意：需要维护 instance_code 到 event_id 的映射关系
+#
+# 4. approval_instance (通用格式)
 #    - 通用审批实例事件格式
 #    - 需要调用飞书API获取审批详情
 #    - 适用于各种类型的审批
@@ -208,9 +338,11 @@ GET {{host}}/docs
 # 测试顺序建议:
 # 1. 先测试健康检查 (1.1) - 确认服务运行正常
 # 2. 测试 URL 验证 (3.1) - 模拟飞书首次配置webhook
-# 3. 测试真实请假审批事件 (2.1) - 测试 leave_approval 类型
-# 4. 测试通用审批事件 (4.1) - 测试 approval_instance 类型
-# 5. 测试幂等性 (5.1, 5.2) - 确认相同事件不会重复处理
+# 3. 测试请假审批事件 (2.1) - 测试 leave_approval 类型
+# 4. 测试请假审批V2事件 (6.1) - 测试 leave_approvalV2 类型（增强版）
+# 5. 测试请假审批撤销 (7.1) - 测试 leave_approval_revert 类型
+# 6. 测试通用审批事件 (4.1) - 测试 approval_instance 类型
+# 7. 测试幂等性 (5.1, 5.2) - 确认相同事件不会重复处理
 
 # 预期结果:
 # - 健康检查: {"status":"ok"}
@@ -234,8 +366,25 @@ GET {{host}}/docs
 #    - 开发: 控制台输出
 #    - Docker: docker compose -f docker/docker-compose.yml logs -f api
 # 5. approval_code 必须在 approval.yaml 的白名单中，否则会被忽略
+# 6. leave_approval_revert 事件需要数据库支持才能完整实现（需要存储 instance_code 到 event_id 的映射）
 
 # 相关文档:
+# - 飞书请假审批事件: https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/approval-v4/approval/events/leave_approval
 # - 飞书审批事件: https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/approval-v4/approval/events/approval_instance_status_changed
 # - API 路由: backend/src/api/feishu/approval.py
 # - 服务逻辑: backend/src/service/feishu/approval.py
+
+# V2版本新增字段说明:
+# - i18n_resources: 国际化资源，包含请假类型的多语言文案
+# - leave_name: 请假类型的国际化key
+# - leave_detail: 请假的详细时间段列表
+# - leave_range: 请假时间范围（与leave_detail类似）
+# - leave_unit: 请假最小单位（HALF_DAY/DAY/HOUR/HALF_HOUR/MINUTE）
+# - leave_interval: 请假时长（秒）
+# - leave_certification: 请假证明材料
+# - leave_difficult_labour: 是否难产
+# - leave_family_relation_type: 亲属类型（配偶父母假等）
+# - leave_feeding_*: 哺乳假相关字段
+# - leave_infant_num: 胎儿数量
+# - leave_pregnancy_*: 孕期相关字段
+# - origin_instance_code: 销假单关联的原始审批

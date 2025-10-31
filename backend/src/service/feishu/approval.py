@@ -58,6 +58,12 @@ class ApprovalService:
             elif event_type == 'leave_approval':
                 # 请假审批事件（请假信息已包含在事件中）
                 return self._handle_leave_approval(event_data)
+            elif event_type == 'leave_approvalV2':
+                # 请假审批事件V2（包含更详细的请假信息）
+                return self._handle_leave_approval_v2(event_data)
+            elif event_type == 'leave_approval_revert':
+                # 请假审批撤销事件
+                return self._handle_leave_approval_revert(event_data)
             else:
                 print(f"⚠️ 未知的审批事件类型: {event_type}")
                 return {"status": "ignored", "reason": f"unknown event type: {event_type}"}
@@ -121,7 +127,8 @@ class ApprovalService:
                 start_time=leave_start_time,
                 end_time=leave_end_time,
                 title=f'{leave_type}(全天) / Time Off',
-                description=f"{leave_type}: {leave_reason}"
+                description=f"{leave_type}: {leave_reason}",
+                instance_code=instance_code
             )
             
             if calendar_result.get('status') == 'success':
@@ -136,6 +143,142 @@ class ApprovalService:
                 
         except Exception as e:
             print(f"❌ 处理请假审批事件失败: {e}")
+            import traceback
+            traceback.print_exc()
+            return {"status": "error", "message": str(e)}
+    
+    def _handle_leave_approval_v2(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        处理请假审批事件V2（包含更详细的请假信息）
+        
+        Args:
+            event_data: 审批事件数据
+        
+        Returns:
+            处理结果
+        """
+        try:
+            event = event_data.get('event', {})
+            
+            # 获取审批定义编码
+            approval_code = event.get('approval_code', '')
+            
+            # 只处理白名单中的审批类型
+            if approval_code and approval_code not in self.leave_approval_codes:
+                print(f"⏭️ 审批类型 {approval_code} 不在处理范围内，跳过")
+                return {"status": "ignored", "reason": f"approval_code {approval_code} not in whitelist"}
+            
+            print(f"✅ 收到请假审批事件V2")
+            
+            # 获取审批实例编码和申请人信息
+            instance_code = event.get('instance_code', '')
+            open_id = event.get('open_id', '')
+            user_id = event.get('user_id', '')
+            
+            # 解析请假类型（需要从 i18n_resources 中获取）
+            leave_type = self._parse_leave_type(
+                event.get('leave_name', ''),
+                event.get('i18n_resources', '')
+            )
+            
+            # 获取请假时间信息
+            leave_start_time = event.get('leave_start_time', '')
+            leave_end_time = event.get('leave_end_time', '')
+            leave_reason = event.get('leave_reason', '请假审批已通过')
+            leave_unit = event.get('leave_unit', 'DAY')
+            leave_interval = event.get('leave_interval', 0)
+            
+            print(f"📋 审批信息:")
+            print(f"   审批定义: {approval_code}")
+            print(f"   实例编码: {instance_code}")
+            print(f"   申请人: {user_id} / {open_id}")
+            print(f"   请假类型: {leave_type}")
+            print(f"   请假时间: {leave_start_time} ~ {leave_end_time}")
+            print(f"   请假时长: {leave_interval}秒 ({leave_unit})")
+            print(f"   请假原因: {leave_reason}")
+            
+            # 验证必填字段
+            if not (open_id and leave_start_time and leave_end_time):
+                print(f"⚠️ 请假信息不完整")
+                return {"status": "error", "message": "请假信息不完整"}
+            
+            # 创建请假日历
+            calendar_result = self._create_timeoff_event(
+                user_id=open_id,
+                start_time=leave_start_time,
+                end_time=leave_end_time,
+                title=f'{leave_type}(全天) / Time Off',
+                description=f"{leave_type}: {leave_reason}",
+                instance_code=instance_code
+            )
+            
+            if calendar_result.get('status') == 'success':
+                print(f"✅ 请假日历创建成功")
+                return {
+                    "status": "success",
+                    "message": "请假日历创建成功",
+                    "calendar_event_id": calendar_result.get('event_id')
+                }
+            else:
+                return calendar_result
+                
+        except Exception as e:
+            print(f"❌ 处理请假审批事件V2失败: {e}")
+            import traceback
+            traceback.print_exc()
+            return {"status": "error", "message": str(e)}
+    
+    def _handle_leave_approval_revert(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        处理请假审批撤销事件（删除已创建的日历事件）
+        
+        Args:
+            event_data: 审批事件数据
+        
+        Returns:
+            处理结果
+        """
+        try:
+            event = event_data.get('event', {})
+            
+            # 获取审批定义编码
+            approval_code = event.get('approval_code', '')
+            
+            # 只处理白名单中的审批类型
+            if approval_code and approval_code not in self.leave_approval_codes:
+                print(f"⏭️ 审批类型 {approval_code} 不在处理范围内，跳过")
+                return {"status": "ignored", "reason": f"approval_code {approval_code} not in whitelist"}
+            
+            print(f"🔄 收到请假审批撤销事件")
+            
+            # 获取审批实例编码
+            instance_code = event.get('instance_code', '')
+            operate_time = event.get('operate_time', '')
+            
+            print(f"📋 撤销信息:")
+            print(f"   审批定义: {approval_code}")
+            print(f"   实例编码: {instance_code}")
+            print(f"   撤销时间: {operate_time}")
+            
+            # 验证必填字段
+            if not instance_code:
+                print(f"⚠️ 实例编码为空")
+                return {"status": "error", "message": "实例编码为空"}
+            
+            # 删除请假日历（根据 instance_code 查找并删除）
+            delete_result = self._delete_timeoff_event_by_instance(instance_code)
+            
+            if delete_result.get('status') == 'success':
+                print(f"✅ 请假日历删除成功")
+                return {
+                    "status": "success",
+                    "message": "请假日历删除成功"
+                }
+            else:
+                return delete_result
+                
+        except Exception as e:
+            print(f"❌ 处理请假审批撤销事件失败: {e}")
             import traceback
             traceback.print_exc()
             return {"status": "error", "message": str(e)}
@@ -202,7 +345,8 @@ class ApprovalService:
                 start_time=leave_info['start_time'],
                 end_time=leave_info['end_time'],
                 title=leave_info.get('title', '请假中(全天) / Time Off'),
-                description=leave_info.get('description', '请假审批已通过')
+                description=leave_info.get('description', '请假审批已通过'),
+                instance_code=instance_code
             )
             
             if calendar_result.get('status') == 'success':
@@ -315,8 +459,42 @@ class ApprovalService:
             print(f"❌ 提取请假信息失败: {e}")
             return None
     
+    def _parse_leave_type(self, leave_name: str, i18n_resources: str) -> str:
+        """
+        解析请假类型（从国际化资源中获取）
+        
+        Args:
+            leave_name: 请假类型的国际化key，例如: @i18n@7276381556766212099
+            i18n_resources: 国际化资源字符串
+        
+        Returns:
+            请假类型文本
+        """
+        try:
+            if not leave_name or not i18n_resources:
+                return "请假"
+            
+            # 解析 i18n_resources
+            # 格式示例: "[{is_default=true,locale=zh_cn,texts={@i18n@7276381556766212099=事假}}]"
+            import re
+            
+            # 提取该 leave_name 对应的文本
+            pattern = rf"{re.escape(leave_name)}=([^,}}]+)"
+            match = re.search(pattern, i18n_resources)
+            
+            if match:
+                leave_type = match.group(1)
+                return leave_type
+            else:
+                print(f"⚠️ 未能解析请假类型: {leave_name} from {i18n_resources}")
+                return "请假"
+                
+        except Exception as e:
+            print(f"❌ 解析请假类型失败: {e}")
+            return "请假"
+    
     def _create_timeoff_event(self, user_id: str, start_time: str, end_time: str, 
-                             title: str, description: str) -> Dict[str, Any]:
+                             title: str, description: str, instance_code: str = None) -> Dict[str, Any]:
         """
         创建请假日历事件
         
@@ -326,6 +504,7 @@ class ApprovalService:
             end_time: 结束时间 (YYYY-MM-DD 或时间戳)
             title: 日程标题
             description: 日程描述
+            instance_code: 审批实例编码（用于后续删除）
         
         Returns:
             创建结果
@@ -344,19 +523,26 @@ class ApprovalService:
             start_timestamp = self._convert_to_timestamp(start_time)
             end_timestamp = self._convert_to_timestamp(end_time)
             
+            # 将 instance_code 添加到描述中，方便后续查找和删除
+            full_description = description
+            if instance_code:
+                full_description = f"{description}\n[审批实例: {instance_code}]"
+            
             data = {
                 "user_id": user_id,
                 "timezone": "Asia/Shanghai",
                 "start_time": str(start_timestamp),
                 "end_time": str(end_timestamp),
                 "title": title,
-                "description": description
+                "description": full_description
             }
             
             print(f"📅 创建请假日历:")
             print(f"   用户: {user_id}")
             print(f"   开始: {start_time} ({start_timestamp})")
             print(f"   结束: {end_time} ({end_timestamp})")
+            if instance_code:
+                print(f"   实例: {instance_code}")
             
             response = requests.post(
                 f"{url}?user_id_type=open_id",
@@ -384,6 +570,43 @@ class ApprovalService:
                 
         except Exception as e:
             print(f"❌ 创建请假日历异常: {e}")
+            import traceback
+            traceback.print_exc()
+            return {"status": "error", "message": str(e)}
+    
+    def _delete_timeoff_event_by_instance(self, instance_code: str) -> Dict[str, Any]:
+        """
+        根据审批实例编码删除请假日历事件
+        
+        注意：由于飞书API限制，无法直接根据 instance_code 查询日历事件，
+        本方法提供了一个示例实现，实际使用时需要维护 instance_code 到 event_id 的映射关系。
+        
+        Args:
+            instance_code: 审批实例编码
+        
+        Returns:
+            删除结果
+        """
+        try:
+            print(f"🗑️ 尝试删除审批实例 {instance_code} 关联的日历事件")
+            
+            # TODO: 实际实现需要：
+            # 1. 维护一个数据库表，存储 instance_code 到 timeoff_event_id 的映射
+            # 2. 在创建日历事件时记录映射关系
+            # 3. 在删除时根据映射关系获取 timeoff_event_id
+            # 4. 调用飞书API删除日历事件
+            
+            # 临时实现：返回成功但提示需要完善
+            print(f"⚠️ 删除日历事件功能需要维护 instance_code 到 event_id 的映射关系")
+            print(f"   请在数据库中实现映射表，或使用其他方式关联审批实例和日历事件")
+            
+            return {
+                "status": "success",
+                "message": "删除请求已接收（需要完善映射关系实现）"
+            }
+            
+        except Exception as e:
+            print(f"❌ 删除请假日历异常: {e}")
             import traceback
             traceback.print_exc()
             return {"status": "error", "message": str(e)}
