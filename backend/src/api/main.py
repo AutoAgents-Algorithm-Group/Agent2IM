@@ -42,15 +42,10 @@ async def lifespan(app: FastAPI):
     # 获取配置文件目录 (从 src/api/ 回到 src/config/)
     config_dir = PathLib(__file__).parent.parent / "config"
     
-    # 检查是否启用统一调度器（通过环境变量控制）
-    # 如果设置了 DISABLE_SCHEDULER=true，则不启动调度器（避免与独立的scheduler服务重复）
-    disable_scheduler = os.environ.get('DISABLE_SCHEDULER', 'false').lower() == 'true'
+    # 检查是否启用统一调度器（通过环境变量控制，默认启用）
     use_unified_scheduler = os.environ.get('USE_UNIFIED_SCHEDULER', 'true').lower() == 'true'
     
-    if disable_scheduler:
-        print("⚠️ 环境变量 DISABLE_SCHEDULER=true，跳过启动调度器")
-        print("⚠️ 请确保有独立的 scheduler 服务在运行")
-    elif use_unified_scheduler:
+    if use_unified_scheduler:
         # 使用新的统一调度器（包含工时检查和新闻推送）
         try:
             print("🚀 正在启动统一定时任务调度器...")
