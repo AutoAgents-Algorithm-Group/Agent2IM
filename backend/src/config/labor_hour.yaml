@@ -54,3 +54,13 @@ schedules:
       mention_users:
         - "刘华鑫"
       description: "每月28号总结过去一个月的工时填写情况，并@刘华鑫"
+    
+    # 每周一上午 10:30 检查上周五工时
+    - id: "labor_monday_friday_check"
+      name: "工时检查 - 周一10:30检查周五"
+      type: "labor_hour"
+      enabled: true
+      schedule: "cron"
+      cron: "30 10 * * 1"
+      offset: -3  # -3=上周五（从周一往前推3天）
+      description: "每周一早上10:30检查上周五的工时填写情况"
