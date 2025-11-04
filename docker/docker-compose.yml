@@ -25,6 +25,7 @@ services:
       - PYTHONPATH=/app/backend
       - PYTHONUNBUFFERED=1
       - TZ=Asia/Shanghai
+      - DISABLE_SCHEDULER=true  # 禁用API服务中的调度器，使用独立的scheduler服务
     volumes:
       # 挂载配置文件（必需）
       - ../backend/src/config/labor_hour.yaml:/app/backend/src/config/labor_hour.yaml:ro
