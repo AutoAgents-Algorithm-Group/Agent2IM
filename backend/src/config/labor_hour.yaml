@@ -26,23 +26,25 @@ group_chat:
 schedules:
   timezone: "Asia/Shanghai"
   tasks:
-    # 每天晚上 19:30 检查当天工时
+    # 周一到周五晚上 19:30 检查当天工时
     - id: "labor_evening_check"
-      name: "工时检查 - 晚上19:30"
+      name: "工时检查 - 周一至周五19:30"
       type: "labor_hour"
       enabled: true
-      schedule: "19:30"
+      schedule: "cron"
+      cron: "30 19 * * 1-5"  # 周一到周五
       offset: 0  # 0=今天
-      description: "工作日晚上19:30检查当天工时填写情况"
+      description: "工作日（周一到周五）晚上19:30检查当天工时填写情况"
     
-    # 第二天早上 10:30 检查昨天工时
+    # 周二到周五早上 10:30 检查昨天工时（周一到周四）
     - id: "labor_morning_makeup"
-      name: "工时检查 - 早上10:30补填提醒"
+      name: "工时检查 - 周二至周五10:30补填提醒"
       type: "labor_hour"
       enabled: true
-      schedule: "10:30"
+      schedule: "cron"
+      cron: "30 10 * * 2-5"  # 周二到周五
       offset: -1  # -1=昨天
-      description: "早上10:30提醒昨天未填写的人补填工时"
+      description: "周二到周五早上10:30提醒昨天（周一到周四）未填写的人补填工时"
     
     # 每月 28 号上午 10:00 发送月报
     - id: "labor_month_summary"

@@ -39,4 +39,4 @@ HEALTHCHECK --interval=60s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:9000/health || exit 1
 
 # 启动应用
-CMD ["/app/start.sh"]
+CMD ["./start.sh"]

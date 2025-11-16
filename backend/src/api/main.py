@@ -6,10 +6,11 @@ Agent2IM - 通用AI驱动的即时通讯集成平台
 
 import os
 import sys
+import logging
 from pathlib import Path as PathLib
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 import uvicorn
 
 # 添加src目录到Python路径
@@ -19,6 +20,13 @@ sys.path.insert(0, str(src_dir))
 
 from src.utils.schedule.unified_scheduler import UnifiedScheduler
 from src.api.feishu import chat, approval, schedule
+
+
+# 自定义日志过滤器 - 过滤掉 /health 端点的访问日志
+class HealthCheckFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        # 过滤掉包含 /health 的日志
+        return "/health" not in record.getMessage()
 
 
 # 全局调度器实例
@@ -35,6 +43,9 @@ async def lifespan(app: FastAPI):
     在应用启动时初始化资源，在关闭时清理资源
     """
     # === 启动阶段 ===
+    # 配置日志过滤器，过滤掉 /health 请求
+    logging.getLogger("uvicorn.access").addFilter(HealthCheckFilter())
+    
     print("=" * 80)
     print("🚀 Agent2IM 正在启动...")
     print("=" * 80)
@@ -171,4 +182,7 @@ def health_check():
 
 
 if __name__ == "__main__":
+    # 配置日志过滤器，过滤掉 /health 请求
+    logging.getLogger("uvicorn.access").addFilter(HealthCheckFilter())
+    
     uvicorn.run(app, host="0.0.0.0", port=9000)

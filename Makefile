@@ -1,4 +1,4 @@
-.PHONY: dev api-build api-up api-restart api-logs api-down scheduler-build scheduler-up scheduler-restart scheduler-logs scheduler-down docker-up docker-down docker-logs docker-ps
+.PHONY: dev app-build app-up app-restart app-logs app-down scheduler-build scheduler-up scheduler-restart scheduler-logs scheduler-down docker-up docker-down docker-logs docker-ps
 
 # 本地开发环境
 dev:
@@ -12,40 +12,40 @@ dev:
 	cd backend && uvicorn src.api.main:app --host 0.0.0.0 --port 9000 --reload
 
 # ============================================
-# API 服务管理（独立部署）
+# 应用服务管理（独立部署）
 # ============================================
 
-api-build:
-	@echo "🔨 构建 API 服务镜像..."
-	cd docker && docker compose build api
+app-build:
+	@echo "🔨 构建应用服务镜像..."
+	cd docker && docker compose build app
 
-api-up:
-	@echo "🚀 启动 API 服务..."
-	cd docker && docker compose up -d api
-	@echo "✅ API 服务已启动"
+app-up:
+	@echo "🚀 启动应用服务..."
+	cd docker && docker compose up -d app
+	@echo "✅ 应用服务已启动"
 	@echo "🔧 API 服务: http://localhost:9000"
 	@echo "📚 API 文档: http://localhost:9000/docs"
 	@echo "💚 健康检查: http://localhost:9000/health"
 
-api-restart:
-	@echo "🔄 重启 API 服务..."
-	cd docker && docker compose restart api
-	@echo "✅ API 服务已重启"
+app-restart:
+	@echo "🔄 重启应用服务..."
+	cd docker && docker compose restart app
+	@echo "✅ 应用服务已重启"
 
-api-logs:
-	@echo "📋 查看 API 服务日志（按 Ctrl+C 退出）..."
-	cd docker && docker compose logs -f api
+app-logs:
+	@echo "📋 查看应用服务日志（按 Ctrl+C 退出）..."
+	cd docker && docker compose logs -f app
 
-api-down:
-	@echo "🛑 停止 API 服务..."
-	cd docker && docker compose stop api
-	@echo "✅ API 服务已停止"
+app-down:
+	@echo "🛑 停止应用服务..."
+	cd docker && docker compose stop app
+	@echo "✅ 应用服务已停止"
 
-api-rebuild:
-	@echo "🔄 重新构建并部署 API 服务..."
-	cd docker && docker compose build api && docker compose up -d api
-	@echo "✅ API 服务已重新部署"
-	@make api-logs
+app-rebuild:
+	@echo "🔄 重新构建并部署应用服务..."
+	cd docker && docker compose build app && docker compose up -d app
+	@echo "✅ 应用服务已重新部署"
+	@make app-logs
 
 # ============================================
 # Scheduler 服务管理（独立部署）
@@ -111,15 +111,15 @@ help:
 	@echo "Agent2IM 部署命令帮助"
 	@echo ""
 	@echo "本地开发："
-	@echo "  make dev              - 启动 API 服务（开发模式，支持热重载）"
+	@echo "  make dev              - 启动应用服务（开发模式，支持热重载）"
 	@echo ""
-	@echo "API 服务管理（独立部署）："
-	@echo "  make api-build        - 构建 API 镜像"
-	@echo "  make api-up           - 启动 API 服务"
-	@echo "  make api-restart      - 重启 API 服务"
-	@echo "  make api-rebuild      - 重新构建并部署 API"
-	@echo "  make api-logs         - 查看 API 日志"
-	@echo "  make api-down         - 停止 API 服务"
+	@echo "应用服务管理（独立部署）："
+	@echo "  make app-build        - 构建应用镜像"
+	@echo "  make app-up           - 启动应用服务"
+	@echo "  make app-restart      - 重启应用服务"
+	@echo "  make app-rebuild      - 重新构建并部署应用"
+	@echo "  make app-logs         - 查看应用日志"
+	@echo "  make app-down         - 停止应用服务"
 	@echo ""
 	@echo "Scheduler 服务管理（独立部署）："
 	@echo "  make scheduler-build  - 构建 Scheduler 镜像"
@@ -136,8 +136,8 @@ help:
 	@echo "  make docker-ps        - 查看容器状态"
 	@echo ""
 	@echo "示例场景："
-	@echo "  1️⃣  只修改了 API 代码，重新部署 API："
-	@echo "     make api-rebuild"
+	@echo "  1️⃣  只修改了应用代码，重新部署应用："
+	@echo "     make app-rebuild"
 	@echo ""
 	@echo "  2️⃣  只修改了 Scheduler 代码，重新部署 Scheduler："
 	@echo "     make scheduler-rebuild"
