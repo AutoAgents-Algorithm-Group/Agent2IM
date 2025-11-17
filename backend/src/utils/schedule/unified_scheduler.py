@@ -161,7 +161,9 @@ class UnifiedScheduler:
                     trigger=trigger,
                     id=task_id,
                     name=task_name,
-                    replace_existing=True
+                    replace_existing=True,
+                    misfire_grace_time=3600,  # 错过后1小时内仍可执行
+                    coalesce=True  # 合并错过的多次执行为一次
                 )
                 
                 print(f"✅ 已添加定时任务: {task_name} ({schedule_desc})")

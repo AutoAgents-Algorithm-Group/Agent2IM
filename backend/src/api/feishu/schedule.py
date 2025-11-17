@@ -87,3 +87,48 @@ def get_scheduler_jobs():
         "jobs": job_list
     }
 
+
+@router.post("/trigger/{job_id}")
+def trigger_job(job_id: str):
+    """
+    手动触发指定的定时任务
+    
+    参数：
+    - job_id: 任务ID（如 labor_monday_friday_check）
+    
+    返回：
+    - status: 执行状态
+    - message: 执行消息
+    """
+    if not _unified_scheduler:
+        return {
+            "status": "error",
+            "message": "定时任务调度器未初始化"
+        }
+    
+    try:
+        # 查找任务
+        job = _unified_scheduler.scheduler.get_job(job_id)
+        if not job:
+            return {
+                "status": "error",
+                "message": f"未找到任务: {job_id}",
+                "available_jobs": [j.id for j in _unified_scheduler.scheduler.get_jobs()]
+            }
+        
+        # 手动执行任务
+        job.func(*job.args, **job.kwargs)
+        
+        return {
+            "status": "success",
+            "message": f"任务 {job.name} 已手动触发执行",
+            "job_id": job_id,
+            "job_name": job.name
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"执行任务失败: {str(e)}"
+        }
+
