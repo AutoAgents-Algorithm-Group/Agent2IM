@@ -1,7 +1,7 @@
-# 飞书应用
+# 飞书应用（审批应用）
 feishu:
-  app_id: "cli_a87352e3c577900e"
-  app_secret: "DlVXx6WbRuDh4PnJkhZeUpjlaXcthWwY"
+  app_id: "cli_a875a7a04178100c"  # 审批事件来源应用
+  app_secret: "R0BlcS58zqMXrcISl5leTcUGBpMcAuyU"
 
 # 审批定义编码
 approval_codes:

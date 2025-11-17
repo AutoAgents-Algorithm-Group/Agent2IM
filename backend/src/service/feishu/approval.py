@@ -49,8 +49,26 @@ class ApprovalService:
             处理结果
         """
         try:
+            event = event_data.get('event', {})
+            
+            # 打印事件来源应用ID（用于诊断 open_id cross app 问题）
+            event_app_id = event.get('app_id', '未知')
+            print(f"\n{'='*80}")
+            print(f"📨 收到审批事件回调")
+            print(f"{'='*80}")
+            print(f"   事件来源应用: {event_app_id}")
+            print(f"   配置的应用:   {self.app_id}")
+            
+            if event_app_id != '未知' and event_app_id != self.app_id:
+                print(f"   ⚠️  警告: 事件来源应用与配置不一致！")
+                print(f"   这可能导致 open_id cross app 错误")
+                print(f"   💡 建议: 修改 approval.yaml 使用事件来源应用: {event_app_id}")
+            elif event_app_id == self.app_id:
+                print(f"   ✅ 应用ID匹配")
+            print(f"{'='*80}\n")
+            
             # 获取事件类型
-            event_type = event_data.get('event', {}).get('type')
+            event_type = event.get('type')
             
             if event_type == 'approval_instance':
                 # 审批实例事件（通用格式，需要调用API获取详情）
@@ -100,6 +118,7 @@ class ApprovalService:
             # 获取审批实例编码和申请人信息
             instance_code = event.get('instance_code', '')
             open_id = event.get('open_id', '')
+            user_id = event.get('user_id', '')
             employee_id = event.get('employee_id', '')
             
             # 获取请假信息
@@ -108,27 +127,33 @@ class ApprovalService:
             leave_end_time = event.get('leave_end_time', '')
             leave_reason = event.get('leave_reason', '请假审批已通过')
             
+            # 优先使用 user_id，其次 open_id，最后尝试 employee_id
+            target_user_id = user_id or open_id or employee_id
+            user_id_type = "user_id" if user_id else ("open_id" if open_id else "employee_id")
+            
             print(f"📋 审批信息:")
             print(f"   审批定义: {approval_code}")
             print(f"   实例编码: {instance_code}")
-            print(f"   申请人: {employee_id} / {open_id}")
+            print(f"   申请人: employee_id={employee_id}, user_id={user_id}, open_id={open_id}")
+            print(f"   使用标识: {target_user_id} (类型: {user_id_type})")
             print(f"   请假类型: {leave_type}")
             print(f"   请假时间: {leave_start_time} ~ {leave_end_time}")
             print(f"   请假原因: {leave_reason}")
             
             # 验证必填字段
-            if not (open_id and leave_start_time and leave_end_time):
+            if not (target_user_id and leave_start_time and leave_end_time):
                 print(f"⚠️ 请假信息不完整")
                 return {"status": "error", "message": "请假信息不完整"}
             
             # 创建请假日历
             calendar_result = self._create_timeoff_event(
-                user_id=open_id,
+                user_id=target_user_id,
                 start_time=leave_start_time,
                 end_time=leave_end_time,
                 title=f'{leave_type}(全天) / Time Off',
                 description=f"{leave_type}: {leave_reason}",
-                instance_code=instance_code
+                instance_code=instance_code,
+                user_id_type=user_id_type
             )
             
             if calendar_result.get('status') == 'success':
@@ -174,6 +199,7 @@ class ApprovalService:
             instance_code = event.get('instance_code', '')
             open_id = event.get('open_id', '')
             user_id = event.get('user_id', '')
+            employee_id = event.get('employee_id', '')
             
             # 解析请假类型（需要从 i18n_resources 中获取）
             leave_type = self._parse_leave_type(
@@ -188,28 +214,34 @@ class ApprovalService:
             leave_unit = event.get('leave_unit', 'DAY')
             leave_interval = event.get('leave_interval', 0)
             
+            # 优先使用 user_id，其次 open_id，最后尝试 employee_id
+            target_user_id = user_id or open_id or employee_id
+            user_id_type = "user_id" if user_id else ("open_id" if open_id else "employee_id")
+            
             print(f"📋 审批信息:")
             print(f"   审批定义: {approval_code}")
             print(f"   实例编码: {instance_code}")
-            print(f"   申请人: {user_id} / {open_id}")
+            print(f"   申请人: employee_id={employee_id}, user_id={user_id}, open_id={open_id}")
+            print(f"   使用标识: {target_user_id} (类型: {user_id_type})")
             print(f"   请假类型: {leave_type}")
             print(f"   请假时间: {leave_start_time} ~ {leave_end_time}")
             print(f"   请假时长: {leave_interval}秒 ({leave_unit})")
             print(f"   请假原因: {leave_reason}")
             
             # 验证必填字段
-            if not (open_id and leave_start_time and leave_end_time):
+            if not (target_user_id and leave_start_time and leave_end_time):
                 print(f"⚠️ 请假信息不完整")
                 return {"status": "error", "message": "请假信息不完整"}
             
             # 创建请假日历
             calendar_result = self._create_timeoff_event(
-                user_id=open_id,
+                user_id=target_user_id,
                 start_time=leave_start_time,
                 end_time=leave_end_time,
                 title=f'{leave_type}(全天) / Time Off',
                 description=f"{leave_type}: {leave_reason}",
-                instance_code=instance_code
+                instance_code=instance_code,
+                user_id_type=user_id_type
             )
             
             if calendar_result.get('status') == 'success':
@@ -339,14 +371,15 @@ class ApprovalService:
                 print(f"⚠️ 未能从审批中提取到请假信息")
                 return {"status": "ignored", "reason": "not a leave approval"}
             
-            # 创建请假日历
+            # 创建请假日历（优先使用 user_id 类型）
             calendar_result = self._create_timeoff_event(
                 user_id=leave_info['user_id'],
                 start_time=leave_info['start_time'],
                 end_time=leave_info['end_time'],
                 title=leave_info.get('title', '请假中(全天) / Time Off'),
                 description=leave_info.get('description', '请假审批已通过'),
-                instance_code=instance_code
+                instance_code=instance_code,
+                user_id_type=leave_info.get('user_id_type', 'user_id')
             )
             
             if calendar_result.get('status') == 'success':
@@ -406,14 +439,22 @@ class ApprovalService:
             approval_detail: 审批详情
         
         Returns:
-            请假信息 {user_id, start_time, end_time, title, description}
+            请假信息 {user_id, user_id_type, start_time, end_time, title, description}
         """
         try:
             # 获取审批表单
             form = approval_detail.get('form', [])
             
+            # 获取用户标识，优先使用 user_id
+            open_id = approval_detail.get('open_id', '')
+            user_id = approval_detail.get('user_id', '')
+            
+            target_user_id = user_id or open_id
+            user_id_type = 'user_id' if user_id else 'open_id'
+            
             leave_info = {
-                'user_id': approval_detail.get('open_id', ''),
+                'user_id': target_user_id,
+                'user_id_type': user_id_type,
                 'start_time': None,
                 'end_time': None,
                 'title': '请假中(全天) / Time Off',
@@ -459,13 +500,13 @@ class ApprovalService:
             print(f"❌ 提取请假信息失败: {e}")
             return None
     
-    def _parse_leave_type(self, leave_name: str, i18n_resources: str) -> str:
+    def _parse_leave_type(self, leave_name: str, i18n_resources) -> str:
         """
         解析请假类型（从国际化资源中获取）
         
         Args:
             leave_name: 请假类型的国际化key，例如: @i18n@7276381556766212099
-            i18n_resources: 国际化资源字符串
+            i18n_resources: 国际化资源（可能是字符串或列表）
         
         Returns:
             请假类型文本
@@ -474,37 +515,57 @@ class ApprovalService:
             if not leave_name or not i18n_resources:
                 return "请假"
             
-            # 解析 i18n_resources
+            # 如果是列表，转换为字符串
+            if isinstance(i18n_resources, list):
+                # i18n_resources 是一个列表，查找 zh_cn 的文本
+                for resource in i18n_resources:
+                    if isinstance(resource, dict):
+                        locale = resource.get('locale', '')
+                        if locale == 'zh_cn':
+                            texts = resource.get('texts', {})
+                            if isinstance(texts, dict):
+                                leave_type = texts.get(leave_name, '')
+                                if leave_type:
+                                    return leave_type
+                # 如果没找到 zh_cn，转换为字符串继续尝试
+                i18n_resources = str(i18n_resources)
+            
+            # 解析 i18n_resources 字符串
             # 格式示例: "[{is_default=true,locale=zh_cn,texts={@i18n@7276381556766212099=事假}}]"
             import re
             
-            # 提取该 leave_name 对应的文本
-            pattern = rf"{re.escape(leave_name)}=([^,}}]+)"
-            match = re.search(pattern, i18n_resources)
+            # 如果是字符串格式，使用正则提取
+            if isinstance(i18n_resources, str):
+                pattern = rf"{re.escape(leave_name)}[=:]\s*([^,}}\]]+)"
+                match = re.search(pattern, i18n_resources)
+                
+                if match:
+                    leave_type = match.group(1).strip().strip('"\'')
+                    return leave_type
             
-            if match:
-                leave_type = match.group(1)
-                return leave_type
-            else:
-                print(f"⚠️ 未能解析请假类型: {leave_name} from {i18n_resources}")
-                return "请假"
+            print(f"⚠️ 未能解析请假类型: {leave_name} from {i18n_resources}")
+            return "请假"
                 
         except Exception as e:
             print(f"❌ 解析请假类型失败: {e}")
+            import traceback
+            traceback.print_exc()
             return "请假"
     
     def _create_timeoff_event(self, user_id: str, start_time: str, end_time: str, 
-                             title: str, description: str, instance_code: str = None) -> Dict[str, Any]:
+                             title: str, description: str, instance_code: str = None,
+                             user_id_type: str = "user_id") -> Dict[str, Any]:
         """
         创建请假日历事件
         
         Args:
-            user_id: 用户ID (open_id)
+            user_id: 用户ID (可以是 open_id, user_id, 或 union_id)
             start_time: 开始时间 (YYYY-MM-DD 或时间戳)
             end_time: 结束时间 (YYYY-MM-DD 或时间戳)
             title: 日程标题
             description: 日程描述
             instance_code: 审批实例编码（用于后续删除）
+            user_id_type: 用户ID类型 (open_id, user_id, union_id)
         
         Returns:
             创建结果
@@ -538,14 +599,14 @@ class ApprovalService:
             }
             
             print(f"📅 创建请假日历:")
-            print(f"   用户: {user_id}")
+            print(f"   用户: {user_id} (类型: {user_id_type})")
             print(f"   开始: {start_time} ({start_timestamp})")
             print(f"   结束: {end_time} ({end_timestamp})")
             if instance_code:
                 print(f"   实例: {instance_code}")
             
             response = requests.post(
-                f"{url}?user_id_type=open_id",
+                f"{url}?user_id_type={user_id_type}",
                 headers=headers,
                 json=data
             )
@@ -683,4 +744,3 @@ def create_approval_service_from_config(config_path: str = None) -> ApprovalServ
         app_secret=app_secret,
         leave_approval_codes=leave_approval_codes
     )
-
