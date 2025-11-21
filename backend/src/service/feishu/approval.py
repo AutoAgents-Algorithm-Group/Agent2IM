@@ -150,7 +150,7 @@ class ApprovalService:
                 user_id=target_user_id,
                 start_time=leave_start_time,
                 end_time=leave_end_time,
-                title=f'{leave_type}(全天) / Time Off',
+                title=f'{leave_type}ing',
                 description=f"{leave_type}: {leave_reason}",
                 instance_code=instance_code,
                 user_id_type=user_id_type
@@ -238,7 +238,7 @@ class ApprovalService:
                 user_id=target_user_id,
                 start_time=leave_start_time,
                 end_time=leave_end_time,
-                title=f'{leave_type}(全天) / Time Off',
+                title=f'{leave_type}ing',
                 description=f"{leave_type}: {leave_reason}",
                 instance_code=instance_code,
                 user_id_type=user_id_type
@@ -376,7 +376,7 @@ class ApprovalService:
                 user_id=leave_info['user_id'],
                 start_time=leave_info['start_time'],
                 end_time=leave_info['end_time'],
-                title=leave_info.get('title', '请假中(全天) / Time Off'),
+                title=leave_info.get('title', '请假ing'),
                 description=leave_info.get('description', '请假审批已通过'),
                 instance_code=instance_code,
                 user_id_type=leave_info.get('user_id_type', 'user_id')
@@ -457,7 +457,7 @@ class ApprovalService:
                 'user_id_type': user_id_type,
                 'start_time': None,
                 'end_time': None,
-                'title': '请假中(全天) / Time Off',
+                'title': '请假ing',
                 'description': '请假审批已通过'
             }
             
